@@ -4,7 +4,7 @@ from .base import BaseModel, GUID, JSONB
 class Deployment(BaseModel):
     __tablename__ = "deployments"
     
-    business_id = Column(GUID(), ForeignKey("businesses.id"), nullable=False)
+    business_id = Column(GUID(), ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
     version = Column(String(50), nullable=False)
     environment = Column(String(50), nullable=False)
     status = Column(String(50), nullable=False, default='pending')

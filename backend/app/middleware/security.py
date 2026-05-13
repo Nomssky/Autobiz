@@ -15,51 +15,60 @@ from app.config import settings
 
 logger = logging.getLogger("security")
 
+try:
+    import redis as _redis
+
+    def _get_redis():
+        try:
+            return _redis.Redis.from_url(settings.REDIS_URL, socket_timeout=2, decode_responses=True)
+        except Exception:
+            return None
+except ImportError:
+    def _get_redis():
+        return None
+
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
-    """
-    Simple in-memory sliding window rate limiter.
-    Limits per-IP request rate to prevent abuse.
-
-    Default: 100 requests per 60 seconds.
-    """
+    """Sliding window rate limiter with Redis backend + in-memory fallback."""
 
     def __init__(self, app, max_requests: int = 100, window_seconds: int = 60):
         super().__init__(app)
         self.max_requests = max_requests
         self.window_seconds = window_seconds
-        self._requests: dict[str, list[float]] = {}
+        self._local: dict[str, list[float]] = {}
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         client_ip = request.client.host if request.client else "unknown"
 
-        # Skip rate limiting for internal/health endpoints
         if request.url.path.startswith(("/health", "/metrics")):
             return await call_next(request)
 
-        current_time = time.time()
-        window_start = current_time - self.window_seconds
+        r = _get_redis()
+        if r:
+            try:
+                key = f"ratelimit:{client_ip}"
+                now = int(time.time())
+                window_start = now - self.window_seconds
+                r.zremrangebyscore(key, 0, window_start)
+                count = r.zcard(key)
+                if count is not None and count >= self.max_requests:
+                    return JSONResponse(status_code=429, content={"detail": "Too many requests"})
+                r.zadd(key, {str(now): now})
+                r.expire(key, self.window_seconds)
+                return await call_next(request)
+            except Exception:
+                r = None
+        if r is None:
+            now = time.time()
+            window_start = now - self.window_seconds
+            if client_ip in self._local:
+                self._local[client_ip] = [t for t in self._local[client_ip] if t > window_start]
+            else:
+                self._local[client_ip] = []
+            if len(self._local[client_ip]) >= self.max_requests:
+                return JSONResponse(status_code=429, content={"detail": "Too many requests"})
+            self._local[client_ip].append(now)
 
-        # Clean old entries
-        if client_ip in self._requests:
-            self._requests[client_ip] = [
-                t for t in self._requests[client_ip] if t > window_start
-            ]
-        else:
-            self._requests[client_ip] = []
-
-        # Check limit
-        if len(self._requests[client_ip]) >= self.max_requests:
-            logger.warning(f"Rate limit exceeded for IP {client_ip}")
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "error": "Rate limit exceeded",
-                    "detail": f"Maximum {self.max_requests} requests per {self.window_seconds}s",
-                },
-            )
-
-        self._requests[client_ip].append(current_time)
         return await call_next(request)
 
 

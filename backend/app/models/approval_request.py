@@ -4,8 +4,8 @@ from .base import BaseModel, GUID, JSONB
 class ApprovalRequest(BaseModel):
     __tablename__ = "approval_requests"
     
-    business_id = Column(GUID(), ForeignKey("businesses.id"), nullable=False)
-    task_id = Column(GUID(), ForeignKey("ai_tasks.id"), nullable=True)
+    business_id = Column(GUID(), ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
+    task_id = Column(GUID(), ForeignKey("ai_tasks.id", ondelete="SET NULL"), nullable=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     proposed_changes = Column(JSONB(), nullable=False)

@@ -48,10 +48,3 @@ def verify_token(token: str) -> Optional[dict]:
         return None
 
 
-def decode_token_unsafe(token: str) -> Optional[dict]:
-    """Decode token without verification (for testing only)."""
-    try:
-        payload = jwt.decode(token, options={"verify_signature": False})
-        return payload
-    except JWTError:
-        return None

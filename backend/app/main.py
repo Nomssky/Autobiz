@@ -75,19 +75,13 @@ app.add_middleware(GzipMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(AuditMiddleware)
 
-# Rate limiting middleware (after auth, before routes)
-try:
-    from app.middleware.security import RateLimitMiddleware
-    app.add_middleware(RateLimitMiddleware)
-except (ImportError, Exception):
-    logger.warning("RateLimitMiddleware not available")
+# Rate limiting middleware
+from app.middleware.security import RateLimitMiddleware
+app.add_middleware(RateLimitMiddleware)
 
 # Webhook security middleware
-try:
-    from app.middleware.security import WebhookAuthMiddleware
-    app.add_middleware(WebhookAuthMiddleware)
-except (ImportError, Exception):
-    logger.warning("WebhookAuthMiddleware not available")
+from app.middleware.security import WebhookAuthMiddleware
+app.add_middleware(WebhookAuthMiddleware)
 
 # ---- Prometheus metrics endpoint ----
 _prometheus = PrometheusMiddleware(app)

@@ -14,7 +14,7 @@ class Organization(BaseModel):
 class OrgMembership(BaseModel):
     __tablename__ = "org_memberships"
 
-    org_id = Column(GUID(), ForeignKey("organizations.id"), nullable=False)
+    org_id = Column(GUID(), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(GUID(), nullable=False)
     role = Column(String(50), nullable=False, default="viewer")
 

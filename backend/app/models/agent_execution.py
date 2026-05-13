@@ -8,7 +8,7 @@ class AgentExecution(BaseModel):
 
     __tablename__ = "agent_executions"
 
-    business_id = Column(GUID(), ForeignKey("businesses.id"), nullable=False)
+    business_id = Column(GUID(), ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
     role_name = Column(String(50), nullable=False)
     action = Column(String(255), nullable=True)
     input_tokens = Column(Integer, nullable=True, default=0)
