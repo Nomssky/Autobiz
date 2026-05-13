@@ -1,0 +1,39 @@
+groups:
+  - name: autobiz_engine_alerts
+    interval: 30s
+    rules:
+      - alert: HighApiErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "API error rate over 5%"
+          description: "API error rate is {{ $value | humanize }}% for the last 5 minutes"
+
+      - alert: RevenueDrop
+        expr: avg(daily_revenue_total[24h]) < avg(daily_revenue_total[7d]) * 0.8
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Revenue dropped more than 20%"
+          description: "Daily revenue dropped {{ $value | humanize }}% compared to 7-day average"
+
+      - alert: HighAgentFailureRate
+        expr: rate(agent_tasks_total{status="failed"}[5m]) / rate(agent_tasks_total[5m]) * 100 > 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Agent task failure rate over 10%"
+          description: "Agent task failure rate is {{ $value | humanize }}% for the last 5 minutes"
+
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 response time over 1 second"
+          description: "P95 response time is {{ $value | humanize }}s"

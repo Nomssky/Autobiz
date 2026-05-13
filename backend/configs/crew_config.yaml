@@ -1,0 +1,155 @@
+# CrewAI Configuration
+# This config defines the agent setup for the AutoBiz Engine
+
+# LLM Configuration
+llm:
+  model: "gpt-4-turbo"
+  temperature: 0.3
+  max_tokens: 4096
+  api_key: "${OPENAI_API_KEY}"
+
+# Agent Definitions
+agents:
+  researcher:
+    role: "Market Research Agent"
+    goal: "Provide comprehensive market intelligence"
+    backstory: "Expert market analyst with deep knowledge of industry analysis"
+    allow_delegation: false
+    verbose: true
+    tools:
+      - web_search_tool
+      - competitor_analysis_tool
+      - trend_analysis_tool
+
+  business_strategist:
+    role: "Business Strategy Agent"
+    goal: "Translate research into actionable business plans"
+    backstory: "Seasoned business consultant who creates winning strategies"
+    allow_delegation: true
+    verbose: true
+    tools:
+      - business_plan_generator
+      - swot_analysis_tool
+
+  designer:
+    role: "UI/UX Design Agent"
+    goal: "Create beautiful, functional interfaces"
+    backstory: "Creative designer specializing in SaaS products"
+    allow_delegation: false
+    verbose: false
+    tools:
+      - brand_generator_tool
+      - wireframe_generator_tool
+      - ui_component_library
+
+  developer:
+    role: "Full Stack Developer Agent"
+    goal: "Build robust, production-ready code"
+    backstory: "Senior engineer with expertise across the full stack"
+    allow_delegation: false
+    verbose: true
+    tools:
+      - code_generator_tool
+      - code_review_tool
+      - test_generator_tool
+      - deployment_tool
+
+  marketer:
+    role: "Digital Marketing Agent"
+    goal: "Drive customer acquisition and brand awareness"
+    backstory: "Data-driven marketer with growth hacking expertise"
+    allow_delegation: true
+    verbose: true
+    tools:
+      - seo_tool
+      - content_generator_tool
+      - ad_optimizer_tool
+      - analytics_tool
+
+  finance:
+    role: "Financial Analyst Agent"
+    goal: "Manage financial planning and unit economics"
+    backstory: "CFA-level financial analyst specializing in startup economics"
+    allow_delegation: false
+    verbose: true
+    tools:
+      - financial_model_tool
+      - pricing_optimizer_tool
+      - revenue_forecaster
+      - unit_economics_calculator
+
+  support:
+    role: "Customer Support Agent"
+    goal: "Build and manage support infrastructure"
+    backstory: "Customer experience expert building scalable support systems"
+    allow_delegation: false
+    verbose: false
+    tools:
+      - faq_generator_tool
+      - ticket_analyzer_tool
+      - sentiment_analyzer
+
+  qa:
+    role: "Quality Assurance Agent"
+    goal: "Ensure code quality and product reliability"
+    backstory: "Experienced QA lead combining automated and manual testing"
+    allow_delegation: false
+    verbose: true
+    tools:
+      - test_runner_tool
+      - security_scanner
+      - performance_profiler
+
+# Process Configuration
+process:
+  type: hierarchical  # sequential | hierarchical | collaborative
+  manager:
+    model: "gpt-4-turbo"
+    temperature: 0.2
+
+# Runtime Settings
+runtime:
+  max_rpm: 10
+  memory_enabled: true
+  verbose: true
+  respect_context_window: true
+
+# Memory Configuration
+memory:
+  type: vector  # vector | relational | hybrid
+  vector_store:
+    backend: qdrant  # pinecone | qdrant | chroma
+    dimension: 1536
+    collection: autobiz_knowledge
+    url: "${QDRANT_URL}"
+    api_key: "${QDRANT_API_KEY}"
+
+# Task Templates
+tasks:
+  build_phase:
+    - role: researcher
+      task_type: market_research
+      input: { action: "competitor_and_market_analysis" }
+    - role: business_strategist
+      task_type: business_plan_generation
+      depends_on: [researcher]
+    - role: designer
+      task_type: brand_and_ui_design
+      depends_on: [researcher]
+    - role: developer
+      task_type: application_generation
+      depends_on: [business_strategist, designer]
+    - role: marketer
+      task_type: marketing_strategy
+      depends_on: [researcher, business_strategist]
+    - role: finance
+      task_type: financial_modeling
+      depends_on: [business_strategist]
+
+  operate_phase:
+    - role: researcher
+      task_type: market_monitoring
+      input: { action: "continuous_market_tracking" }
+    - role: developer
+      task_type: maintenance
+      input: { action: "bug_fixes_and_improvements" }

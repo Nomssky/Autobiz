@@ -1,0 +1,522 @@
+{
+  "__inputs": [],
+  "__requires": [],
+  "title": "AutoBiz Engine - Production Overview",
+  "uid": "autobiz-engine-prod",
+  "version": 1,
+  "timezone": "utc",
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "tags": ["autobiz-engine", "production"],
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "30m", "1h", "2h", "1d"],
+    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "business",
+        "type": "query",
+        "query": "label_values(business_status, business_id)",
+        "refresh": 1,
+        "includeAll": true,
+        "allValue": ".*",
+        "multi": true
+      }
+    ]
+  },
+  "annotations": {
+    "list": [
+      {
+        "name": "Deployments",
+        "type": "dashboard",
+        "builtIn": 1,
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "query": "timestamp(deployments_total{status=\"success\"})",
+        "titleFormat": "Deployment",
+        "textFormat": "{{environment}} deploy"
+      },
+      {
+        "name": "Approvals",
+        "type": "dashboard",
+        "builtIn": 2,
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "enable": true,
+        "iconColor": "rgba(255, 159, 0, 1)",
+        "query": "timestamp(approval_requests_total)",
+        "titleFormat": "Approval",
+        "textFormat": "{{status}} - {{urgency}}"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "title": "Revenue Overview",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(daily_revenue_total{business_id=~\"$business\"})",
+          "legendFormat": "Daily Revenue"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "green", "value": 500 }
+            ]
+          }
+        }
+      },
+      "description": "Total daily revenue across all businesses"
+    },
+    {
+      "title": "Active Users",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "id": 2,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(active_users_total{business_id=~\"$business\"})",
+          "legendFormat": "Active Users"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "green", "value": 200 }
+            ]
+          }
+        }
+      },
+      "description": "Total active users across all businesses"
+    },
+    {
+      "title": "Business Status",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "id": 3,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(business_status)",
+          "legendFormat": "Businesses"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "green", "value": 5 }
+            ]
+          }
+        }
+      },
+      "description": "Number of businesses being managed"
+    },
+    {
+      "title": "API Request Rate",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 4,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{business_id=~\"$business\"}[5m])",
+          "legendFormat": "{{method}} {{route}}",
+          "interval": "15s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        }
+      },
+      "description": "API request rate grouped by method and route"
+    },
+    {
+      "title": "API Error Rate",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 5,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{status=~\"5..\"}[5m]) / rate(http_requests_total[5m]) * 100",
+          "legendFormat": "Error Rate %",
+          "interval": "15s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "description": "API error rate as percentage of total requests",
+      "alert": {
+        "alertRuleTags": { "severity": "critical" },
+        "conditions": [
+          {
+            "evaluator": { "params": [5], "type": "gt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "params": [], "type": "avg" }
+          }
+        ],
+        "for": "5m",
+        "frequency": "1m",
+        "noDataState": "ok",
+        "notifications": []
+      }
+    },
+    {
+      "title": "Revenue Trend (7 days)",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "id": 6,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "avg(daily_revenue_total{business_id=~\"$business\"})",
+          "legendFormat": "Avg Daily Revenue",
+          "interval": "1h"
+        },
+        {
+          "expr": "avg(weekly_revenue_total{business_id=~\"$business\"})",
+          "legendFormat": "Avg Weekly Revenue",
+          "interval": "6h"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        }
+      },
+      "description": "Revenue trend over the last 7 days",
+      "alert": {
+        "alertRuleTags": { "severity": "warning" },
+        "conditions": [
+          {
+            "evaluator": { "params": [20], "type": "lt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "24h", "now"] },
+            "reducer": { "params": [], "type": "avg" }
+          }
+        ],
+        "for": "1h",
+        "frequency": "5m",
+        "noDataState": "ok",
+        "notifications": [],
+        "message": "Revenue dropped more than 20% in the last 24 hours compared to average"
+      }
+    },
+    {
+      "title": "Agent Task Status",
+      "type": "piechart",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 20
+      },
+      "id": 7,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(agent_tasks_total{business_id=~\"$business\"}) by (status)",
+          "legendFormat": "{{status}}",
+          "interval": "1m"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        }
+      },
+      "description": "Distribution of agent task statuses"
+    },
+    {
+      "title": "Agent Task Failure Rate",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 20
+      },
+      "id": 8,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(agent_tasks_total{status=\"failed\"}[5m]) / rate(agent_tasks_total[5m]) * 100",
+          "legendFormat": "Failure Rate %",
+          "interval": "15s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "description": "Agent task failure rate as percentage of total tasks",
+      "alert": {
+        "alertRuleTags": { "severity": "critical" },
+        "conditions": [
+          {
+            "evaluator": { "params": [10], "type": "gt" },
+            "operator": { "type": "and" },
+            "query": { "params": ["A", "5m", "now"] },
+            "reducer": { "params": [], "type": "avg" }
+          }
+        ],
+        "for": "5m",
+        "frequency": "1m",
+        "noDataState": "ok",
+        "notifications": []
+      }
+    },
+    {
+      "title": "LLM Cost Tracking",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 28
+      },
+      "id": 9,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(llm_cost_total{business_id=~\"$business\"}[1h]))",
+          "legendFormat": "LLM Cost/hour"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        }
+      },
+      "description": "LLM API cost per hour"
+    },
+    {
+      "title": "Deployment Status",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 28
+      },
+      "id": 10,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "count(deployments_total{status=\"success\"} >= 1)",
+          "legendFormat": "Deployments"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "description": "Successful deployments"
+    },
+    {
+      "title": "Approval Request Volume",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 28
+      },
+      "id": 11,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "rate(approval_requests_total{business_id=~\"$business\"}[1h])",
+          "legendFormat": "{{status}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      },
+      "description": "Approval request rate by status"
+    },
+    {
+      "title": "Response Time (p50/p95/p99)",
+      "type": "graph",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 36
+      },
+      "id": 12,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{business_id=~\"$business\"}[5m])) by (le))",
+          "legendFormat": "p50",
+          "interval": "15s"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{business_id=~\"$business\"}[5m])) by (le))",
+          "legendFormat": "p95",
+          "interval": "15s"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{business_id=~\"$business\"}[5m])) by (le))",
+          "legendFormat": "p99",
+          "interval": "15s"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
+      "description": "API response time percentiles"
+    }
+  ],
+  "schemaVersion": 27,
+  "style": "dark",
+  "tags": ["autobiz-engine"],
+  "links": [],
+  "refresh": "10s"
+}
