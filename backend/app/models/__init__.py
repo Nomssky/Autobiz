@@ -13,9 +13,11 @@ from app.models.agent_execution import AgentExecution
 from app.models.subscription import Subscription
 from app.models.organization import Organization, OrgMembership
 from app.models.audit_log import AuditLog
+from app.models.user import User
 
 __all__ = [
     "BaseModel",
+    "User",
     "Business",
     "AgentTask",
     "ApprovalRequest",

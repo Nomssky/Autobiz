@@ -6,9 +6,11 @@ import logging
 from datetime import datetime
 from pydantic import BaseModel, ValidationError
 
+from app.config import settings
+
 logger = logging.getLogger(__name__)
 
-# ---- Real LLM integration with mock fallback ----
+# ---- Real LLM integration with silent mock fallback ----
 
 try:
     from langchain_openai import ChatOpenAI as _RealChatOpenAI
@@ -18,9 +20,9 @@ try:
     class ChatOpenAI:
         def __init__(self, model: str, temperature: float, api_key: str):
             self._llm = _RealChatOpenAI(
-                model=model or "gpt-4-turbo",
+                model=model or settings.OPENAI_MODEL,
                 temperature=temperature or 0.7,
-                api_key=api_key,
+                api_key=api_key or settings.OPENAI_API_KEY,
             )
             self.model = model
 
@@ -30,6 +32,10 @@ try:
                 messages.append(SystemMessage(content=system_prompt))
             messages.append(HumanMessage(content=prompt))
             result = await self._llm.ainvoke(messages)
+            self.last_token_usage = {
+                "input_tokens": result.usage_metadata.get("input_tokens", 0) if hasattr(result, "usage_metadata") else 0,
+                "output_tokens": result.usage_metadata.get("output_tokens", 0) if hasattr(result, "usage_metadata") else 0,
+            }
             return result.content
 
     Tool = _RealTool
@@ -44,63 +50,13 @@ except ImportError:
             self.api_key = api_key
 
         async def ainvoke(self, prompt: str, system_prompt: str = None) -> str:
-            prefix = system_prompt[:50] if system_prompt else ""
-            return f"Mock response for: {prefix}...{prompt[:50]}..."
+            return ""
 
     class Tool:
         def __init__(self, name: str, func, description: str):
             self.name = name
             self.func = func
             self.description = description
-
-# ---- CrewAI integration ----
-
-try:
-    from crewai import Agent as _CrewAgent, Task as _CrewTask, Crew as _Crew
-
-    class CrewAgent:
-        @staticmethod
-        def create(role: str, goal: str, backstory: str, tools: list, llm: Any) -> Any:
-            return _CrewAgent(
-                role=role,
-                goal=goal,
-                backstory=backstory,
-                tools=tools,
-                llm=llm._llm if hasattr(llm, '_llm') else None,
-                verbose=True,
-            )
-
-    class CrewTask:
-        @staticmethod
-        def create(description: str, expected_output: str, agent: Any) -> Any:
-            return _CrewTask(
-                description=description,
-                expected_output=expected_output,
-                agent=agent,
-            )
-
-    class CrewRunner:
-        @staticmethod
-        async def run(crew: Any) -> str:
-            return await crew.kickoff_async()
-
-except ImportError:
-    logger.warning("crewai not installed — using mock CrewAI")
-
-    class CrewAgent:
-        @staticmethod
-        def create(role: str, goal: str, backstory: str, tools: list, llm: Any) -> Any:
-            return type("obj", (object,), {"role": role})()
-
-    class CrewTask:
-        @staticmethod
-        def create(description: str, expected_output: str, agent: Any) -> Any:
-            return type("obj", (object,), {"description": description})()
-
-    class CrewRunner:
-        @staticmethod
-        async def run(crew: Any) -> str:
-            return "Mock crew execution complete"
 
 logger = logging.getLogger(__name__)
 
@@ -137,13 +93,11 @@ class BaseAgent(ABC):
         self.business_id = business_id
         self.role_name = role_name
         self.config = config
-        # In a real app, we would get these from settings
         self.llm = ChatOpenAI(
-            model="gpt-4-turbo",
+            model=settings.OPENAI_MODEL,
             temperature=config.get("temperature", 0.7),
-            api_key="mock-api-key"
+            api_key=settings.OPENAI_API_KEY,
         )
-        # Placeholder for vector store and memory
         self.vector_store = None
         self.memory = {}
         

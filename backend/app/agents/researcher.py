@@ -1,33 +1,51 @@
 from typing import Dict, Any, List, Optional
 from uuid import UUID
+import json
 import logging
 from app.agents.base_agent import BaseAgent, AgentResult
+from app.agents.schemas.researcher_output import ResearcherOutput, Competitor
 
 logger = logging.getLogger(__name__)
 
+MARKET_ANALYSIS_PROMPT = """You are a market research analyst. Analyze this business idea and provide a structured JSON output with:
+- business_name: a catchy name for this business
+- market_size_usd: total addressable market in USD (float)
+- competitors: array of {name, market_share, strengths[], weaknesses[], pricing}
+- opportunity_score: 0-100 score
+- recommended_positioning: strategy recommendation
+- target_audience: array of target customer segments
+- tech_stack: array of recommended technologies
+- estimated_cac: customer acquisition cost estimate
+- estimated_ltv: lifetime value estimate
+- business_model: "saas", "subscription", "marketplace", etc.
+- brand_personality: brand tone
+- usp: unique selling points
+- description: business description
+- risk_factors: array of potential risks
+
+Business idea: {idea}
+
+Return ONLY valid JSON, no markdown."""
+
+
 class ResearcherAgent(BaseAgent):
-    """AI Researcher agent that conducts market and competitor research"""
-    
+    """AI Researcher agent that conducts market and competitor research using LLM"""
+
     def __init__(self, business_id: UUID, config: Dict[str, Any]):
         super().__init__(business_id, "researcher", config)
-        # In a real implementation, these would be initialized properly
-        self.web_search_tool = None  # Placeholder for web search tool
-        self.competitor_analysis_tool = None  # Placeholder for competitor analysis tool
-    
+
     def get_tools(self) -> List:
-        """Return list of tools available to this agent"""
-        # Mock tools for now
         return []
-    
+
     async def execute_task(
         self,
         task_type: str,
         input_data: Dict[str, Any],
         context: Optional[Dict] = None
     ) -> AgentResult:
-        """Execute researcher task based on type"""
-        
-        if task_type == "market_analysis":
+        if task_type == "validate_business_idea":
+            return await self._validate_business_idea(input_data)
+        elif task_type == "market_analysis":
             return await self._conduct_market_analysis(input_data)
         elif task_type == "competitor_research":
             return await self._research_competitors(input_data)
@@ -39,75 +57,83 @@ class ResearcherAgent(BaseAgent):
                 output=None,
                 error=f"Unknown task type: {task_type}"
             )
-    
+
+    async def _validate_business_idea(self, data: Dict[str, Any]) -> AgentResult:
+        idea = data.get("idea", "")
+        logger.info(f"Validating business idea: {idea}")
+
+        prompt = MARKET_ANALYSIS_PROMPT.format(idea=idea)
+        system = "You are a seasoned startup advisor and market analyst."
+
+        try:
+            response = await self.llm.ainvoke(prompt, system_prompt=system)
+            output = json.loads(response)
+            validated = ResearcherOutput(**output)
+            tokens = getattr(self.llm, "last_token_usage", {})
+
+            return AgentResult(
+                success=True,
+                output=validated.model_dump(),
+                requires_approval=validated.opportunity_score < 40,
+                approval_proposal={
+                    "title": f"Low opportunity score: {validated.opportunity_score}/100",
+                    "description": f"Business idea '{validated.business_name}' scored low on opportunity. Consider pivoting.",
+                    "impact": f"Market size: ${validated.market_size_usd:,.0f}",
+                } if validated.opportunity_score < 40 else None,
+                tokens_used=tokens,
+            )
+        except Exception as e:
+            logger.error(f"Market analysis failed: {e}")
+            return AgentResult(success=False, output=None, error=str(e))
+
     async def _conduct_market_analysis(self, data: Dict[str, Any]) -> AgentResult:
-        """Conduct market analysis for a business idea"""
-        logger.info(f"Conducting market analysis for: {data.get('idea')}")
-        
-        # Mock implementation
-        output = {
-            "market_size": {
-                "tam": "$1B",
-                "sam": "$100M",
-                "som": "$10M"
-            },
-            "target_audience": "Tech-savvy professionals aged 25-45",
-            "key_trends": ["AI adoption", "Remote work", "Subscription models"],
-            "pain_points": ["High cost", "Complexity", "Lack of integration"]
-        }
-        
-        # Determine if approval is needed (mock logic)
-        # Research typically doesn't require immediate approval unless it suggests a major pivot
-        requires_approval = data.get("suggest_pivot", False)
-        
-        return AgentResult(
-            success=True,
-            output=output,
-            requires_approval=requires_approval,
-            approval_proposal={
-                "title": f"Pivot Recommendation: {data.get('idea')}",
-                "description": "Market analysis suggests a pivot to a different target market.",
-                "impact": "Potential to increase market share by 20%"
-            } if requires_approval else None
-        )
-    
+        return await self._validate_business_idea(data)
+
     async def _research_competitors(self, data: Dict[str, Any]) -> AgentResult:
-        """Research competitors in the market"""
-        logger.info(f"Researching competitors for: {data.get('industry')}")
-        
-        # Mock implementation
-        output = {
-            "competitors": [
-                {"name": "Competitor A", "strengths": ["Brand recognition"], "weaknesses": ["High price"]},
-                {"name": "Competitor B", "strengths": ["Feature set"], "weaknesses": ["Poor support"]}
-            ],
-            "market_gaps": ["Affordable pricing", "Better user experience"],
-            "recommended_positioning": "Mid-market with focus on ease of use"
-        }
-        
-        return AgentResult(
-            success=True,
-            output=output,
-            requires_approval=False
-        )
-    
+        industry = data.get("industry", data.get("idea", "unknown"))
+        prompt = f"""Research the competitive landscape for: {industry}
+
+Return JSON with:
+- competitors: array of {{name, market_share (float), strengths[], weaknesses[], pricing}}
+- market_gaps: array of unmet customer needs
+- recommended_positioning: recommended market position"""
+
+        try:
+            response = await self.llm.ainvoke(prompt, system_prompt="You are a competitive intelligence analyst.")
+            output = json.loads(response)
+            competitors = [Competitor(**c) for c in output.get("competitors", [])]
+
+            return AgentResult(
+                success=True,
+                output={
+                    "competitors": [c.model_dump() for c in competitors],
+                    "market_gaps": output.get("market_gaps", []),
+                    "recommended_positioning": output.get("recommended_positioning", ""),
+                },
+                requires_approval=False,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
+        except Exception as e:
+            logger.error(f"Competitor research failed: {e}")
+            return AgentResult(success=False, output=None, error=str(e))
+
     async def _analyze_trends(self, data: Dict[str, Any]) -> AgentResult:
-        """Analyze market trends"""
-        logger.info(f"Analyzing trends for: {data.get('sector')}")
-        
-        # Mock implementation
-        output = {
-            "emerging_trends": [
-                {"trend": "AI-powered automation", "impact": "High", "timeline": "6-12 months"},
-                {"trend": "No-code platforms", "impact": "Medium", "timeline": "12-18 months"}
-            ],
-            "declining_trends": [
-                {"trend": "On-premise software", "impact": "Negative", "timeline": "Already declining"}
-            ]
-        }
-        
-        return AgentResult(
-            success=True,
-            output=output,
-            requires_approval=False
-        )
+        sector = data.get("sector", data.get("idea", "technology"))
+        prompt = f"""Analyze current market trends for: {sector}
+
+Return JSON with:
+- emerging_trends: array of {{trend, impact ("High"/"Medium"/"Low"), timeline}}
+- declining_trends: array of {{trend, impact, timeline}}"""
+
+        try:
+            response = await self.llm.ainvoke(prompt, system_prompt="You are a market intelligence analyst.")
+            output = json.loads(response)
+            return AgentResult(
+                success=True,
+                output=output,
+                requires_approval=False,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
+        except Exception as e:
+            logger.error(f"Trend analysis failed: {e}")
+            return AgentResult(success=False, output=None, error=str(e))
