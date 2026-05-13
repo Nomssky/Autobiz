@@ -13,15 +13,15 @@ class NotificationService:
     """Service for sending notifications via multiple channels"""
     
     def __init__(self):
-        # In a real implementation, these would come from config
+        from app.config import settings
         self.email_config = {
             "smtp_server": "smtp.gmail.com",
             "smtp_port": 587,
-            "username": "notifications@autobiz.engine",
-            "password": "app-password"
+            "username": settings.RESEND_API_KEY or "notifications@autobiz.engine",
+            "password": settings.SENDGRID_API_KEY or "app-password"
         }
-        self.discord_webhook_url = "https://discord.com/api/webhooks/..."
-        self.sms_api_key = "your-sms-api-key"
+        self.discord_webhook_url = settings.DISCORD_WEBHOOK_URL or ""
+        self.sms_api_key = ""
         
     async def send_email(self, to: str, subject: str, body: str, is_html: bool = False) -> bool:
         """Send an email notification"""

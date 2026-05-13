@@ -1,5 +1,6 @@
 from celery import Celery
 from celery.signals import worker_ready, worker_shutdown
+from kombu import Queue, Exchange
 from app.config import settings
 import logging
 
@@ -14,6 +15,9 @@ celery_app = Celery(
         "app.workers.build_tasks",
         "app.workers.operate_tasks",
         "app.workers.monitoring_tasks",
+        "app.tasks.business_tasks",
+        "app.tasks.agent_tasks",
+        "app.tasks.batch_tasks",
     ]
 )
 
@@ -25,13 +29,45 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
     task_track_started=True,
-    task_time_limit=3600,          # 1 hour max per task
-    task_soft_time_limit=1800,     # 30 min soft limit
-    worker_prefetch_multiplier=1,  # Process one task at a time per worker
-    task_acks_late=True,           # Acknowledge after task completes
+    task_time_limit=3600,
+    task_soft_time_limit=1800,
+    worker_prefetch_multiplier=1,
+    task_acks_late=True,
     task_reject_on_worker_lost=True,
     broker_connection_retry_on_startup=True,
-    result_expires=3600,           # Results expire after 1 hour
+    result_expires=3600,
+
+    task_routes={
+        "app.tasks.batch_tasks.batched_create_business": {"queue": "batch"},
+        "app.tasks.batch_tasks.batched_metrics_aggregation": {"queue": "batch"},
+        "app.tasks.business_tasks.*": {"queue": "business"},
+        "app.tasks.agent_tasks.*": {"queue": "agent"},
+    },
+
+    task_queues=[
+        Queue("critical", Exchange("critical"), routing_key="critical"),
+        Queue("agent", Exchange("agent"), routing_key="agent"),
+        Queue("business", Exchange("business"), routing_key="business"),
+        Queue("batch", Exchange("batch"), routing_key="batch"),
+    ],
+
+    beat_schedule={
+        "aggregate-metrics-every-5min": {
+            "task": "app.tasks.batch_tasks.batched_metrics_aggregation",
+            "schedule": 300.0,
+            "options": {"queue": "batch"},
+        },
+        "cleanup-old-cache-every-hour": {
+            "task": "app.tasks.batch_tasks.cache_cleanup",
+            "schedule": 3600.0,
+            "options": {"queue": "batch"},
+        },
+        "retry-failed-tasks-every-10min": {
+            "task": "app.tasks.batch_tasks.retry_failed_tasks",
+            "schedule": 600.0,
+            "options": {"queue": "batch"},
+        },
+    },
 )
 
 

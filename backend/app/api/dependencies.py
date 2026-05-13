@@ -11,42 +11,11 @@ from app.config import settings
 
 # ---- Database Engine & Session ----
 
-_engine = None
-
-
-def get_engine():
-    """Create and return the database engine (lazy singleton)."""
-    global _engine
-    if _engine is None:
-        try:
-            _engine = create_engine(
-                settings.DATABASE_URL,
-                pool_size=settings.DATABASE_POOL_SIZE,
-                pool_pre_ping=True,
-                pool_recycle=3600,
-                pool_timeout=settings.DATABASE_POOL_TIMEOUT,
-                echo=settings.DATABASE_ECHO,
-            )
-        except Exception as e:
-            if settings.DEBUG:
-                _engine = create_engine(
-                    "sqlite:///./test.db",
-                    connect_args={"check_same_thread": False},
-                    echo=False,
-                )
-            else:
-                raise
-    return _engine
-
-
-def get_session_factory():
-    engine = get_engine()
-    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
+from app.database import get_engine, SessionLocal
 
 
 def get_db_session() -> Generator[Session, None, None]:
     """Dependency that provides a database session."""
-    SessionLocal = get_session_factory()
     db = SessionLocal()
     try:
         yield db

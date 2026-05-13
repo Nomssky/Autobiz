@@ -12,6 +12,7 @@ class Business(BaseModel):
     current_phase = Column(String(50), nullable=False, default='initialization')
     business_metadata = Column(JSON, nullable=False, default={})
     extra_metadata = Column(JSON, nullable=False, default={})
+    config = Column(JSON, nullable=True, default={})
     launched_at = Column(DateTime(timezone=True), nullable=True)
     archived_at = Column(DateTime(timezone=True), nullable=True)
 

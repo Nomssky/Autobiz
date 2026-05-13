@@ -5,6 +5,7 @@ from uuid import UUID
 from datetime import datetime, timedelta
 
 from app.api.dependencies import get_db_session, get_current_user
+from app.config import settings
 from app.models.subscription import Subscription
 from app.models.agent_execution import AgentExecution
 
@@ -128,7 +129,7 @@ def create_checkout_session(
 
     try:
         import stripe
-        stripe.api_key = "sk_test_placeholder"
+        stripe.api_key = settings.STRIPE_API_KEY
 
         if sub and sub.stripe_customer_id:
             customer_id = sub.stripe_customer_id

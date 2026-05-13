@@ -37,7 +37,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - backend/.env
+      - .env
     environment:
       DATABASE_URL: postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@db:5432/autobiz_engine
       REDIS_URL: redis://redis:6379
@@ -54,7 +54,7 @@ services:
       redis:
         condition: service_healthy
     env_file:
-      - backend/.env
+      - .env
     environment:
       DATABASE_URL: postgresql+psycopg2://${DB_USER}:${DB_PASSWORD}@db:5432/autobiz_engine
       REDIS_URL: redis://redis:6379
