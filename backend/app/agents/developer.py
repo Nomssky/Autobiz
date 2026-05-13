@@ -3,31 +3,45 @@ from uuid import UUID
 import json
 import logging
 from app.agents.base_agent import BaseAgent, AgentResult
+from app.agents.schemas.developer_output import DeveloperOutput
 
 logger = logging.getLogger(__name__)
 
+DEV_SPEC_PROMPT = """You are a senior software architect. Given a business idea and specification, design a technical implementation plan.
+
+Return JSON with:
+- tech_stack: array of recommended technologies/frameworks
+- architecture_summary: high-level architecture description
+- features: array of {name, description, priority}
+- timeline_weeks: estimated weeks to build (integer)
+- estimated_cost_usd: estimated development cost
+- version: "1.0.0"
+- decisions: array of {category, choice, rationale} for key technical decisions
+- risks: array of potential risks
+
+Business name: {business_name}
+Description: {description}
+Features: {features}
+Tech stack context: {tech_stack}
+
+Return ONLY valid JSON."""
+
+
 class DeveloperAgent(BaseAgent):
-    """AI Developer agent that writes and deploys code"""
-    
+    """AI Developer agent that designs and plans application architecture using LLM"""
+
     def __init__(self, business_id: UUID, config: Dict[str, Any]):
         super().__init__(business_id, "developer", config)
-        # In a real implementation, these would be initialized properly
-        self.sandbox = None  # CodeSandbox()
-        self.deploy_manager = None  # DeployManager()
-    
+
     def get_tools(self) -> List:
-        """Return list of tools available to this agent"""
-        # Mock tools for now
         return []
-    
+
     async def execute_task(
         self,
         task_type: str,
         input_data: Dict[str, Any],
         context: Optional[Dict] = None
     ) -> AgentResult:
-        """Execute developer task based on type"""
-        
         if task_type == "generate_application":
             return await self._generate_full_application(input_data)
         elif task_type == "fix_bug":
@@ -42,126 +56,134 @@ class DeveloperAgent(BaseAgent):
                 output=None,
                 error=f"Unknown task type: {task_type}"
             )
-    
+
     async def _generate_full_application(self, spec: Dict[str, Any]) -> AgentResult:
-        """Generate complete application from specification"""
-        logger.info(f"Generating full application for business: {spec.get('business_name')}")
-        
-        # Mock implementation - in reality this would use LLM to generate code
-        output = {
-            "message": f"Generated application for {spec.get('business_name')}",
-            "spec_received": spec,
-            "files_generated": 5,  # Mock number
-            "staging_url": "http://staging.example.com"
-        }
-        
-        # Determine if approval is needed (mock logic)
-        requires_approval = spec.get("complexity", "low") == "high"
-        
-        approval_proposal = None
-        if requires_approval:
-            approval_proposal = {
-                "title": f"Deploy {spec.get('business_name')} to staging",
-                "description": "Full application generated. Review before launching.",
-                "impact": "Initial launch of business",
-                "staging_url": output["staging_url"]
-            }
-        
-        return AgentResult(
-            success=True,
-            output=output,
-            requires_approval=requires_approval,
-            approval_proposal=approval_proposal
+        business_name = spec.get("business_name", "Unknown")
+        logger.info(f"Generating application architecture for: {business_name}")
+
+        prompt = DEV_SPEC_PROMPT.format(
+            business_name=business_name,
+            description=spec.get("description", ""),
+            features=json.dumps(spec.get("features", [])),
+            tech_stack=json.dumps(spec.get("tech_stack", [])),
         )
-    
-    async def _handle_bug_fix(self, bug_data: Dict[str, Any]) -> AgentResult:
-        """Analyze and fix a reported bug"""
-        logger.info(f"Handling bug fix: {bug_data.get('description', 'Unknown bug')}")
-        
-        # Mock implementation
-        output = {
-            "fix_applied": True,
-            "deployed": False,
-            "fix_ready": True,
-            "bug_id": bug_data.get("id")
-        }
-        
-        # Mock approval logic - critical bugs might be auto-deployed
-        auto_deploy = bug_data.get("severity") == "critical"
-        
-        if auto_deploy:
-            output["deployed"] = True
-            output["deployment_id"] = "deploy-123"
-        
-        return AgentResult(
-            success=True,
-            output=output,
-            requires_approval=not auto_deploy,
-            approval_proposal={
-                "title": f"Deploy bug fix: {bug_data.get('description', '')[:50]}",
-                "description": f"Fix for bug: {bug_data.get('description', '')}",
-                "fix_summary": "Applied fix for reported issue"
-            } if not auto_deploy else None
-        )
-    
-    async def _implement_feature(self, feature_data: Dict[str, Any]) -> AgentResult:
-        """Implement new feature request"""
-        logger.info(f"Implementing feature: {feature_data.get('name', 'Unknown feature')}")
-        
-        # Mock implementation
-        feature_spec = feature_data.get("specification", {})
-        
-        # Determine if this requires approval (mock logic)
-        requires_approval = any([
-            feature_spec.get("changes_database", False),
-            feature_spec.get("breaking_changes", False),
-            feature_spec.get("estimated_hours", 0) > 8
-        ])
-        
-        output = {
-            "implementation": "Feature implemented",
-            "test_results": {"passed": 8, "total": 10},
-            "staging_ready": True
-        }
-        
-        return AgentResult(
-            success=True,
-            output=output,
-            requires_approval=requires_approval,
-            approval_proposal={
-                "title": f"Feature: {feature_spec.get('name')}",
-                "description": feature_spec.get('description'),
-                "breaking_changes": feature_spec.get("breaking_changes", False),
-                "test_results": "8/10 tests passed"
-            } if requires_approval else None
-        )
-    
-    async def _handle_deployment(self, deploy_data: Dict[str, Any]) -> AgentResult:
-        """Handle deployment to production"""
-        logger.info(f"Handling deployment to {deploy_data.get('environment', 'production')}")
-        
-        environment = deploy_data.get("environment", "production")
-        
-        if environment == "production":
-            # Always require approval for production (mock)
+
+        try:
+            response = await self.llm.ainvoke(prompt, system_prompt="You are a senior software architect.")
+            output = json.loads(response)
+            validated = DeveloperOutput(**output)
+
+            requires_approval = validated.estimated_cost_usd > 10000
+
             return AgentResult(
                 success=True,
-                output={"ready_for_deployment": True},
-                requires_approval=True,
+                output=validated.model_dump(),
+                requires_approval=requires_approval,
                 approval_proposal={
-                    "title": f"Deploy to Production: {deploy_data.get('version', 'v1.0')}",
-                    "description": f"Changes: {deploy_data.get('changelog', 'No changelog provided')}",
-                    "impact_analysis": deploy_data.get("impact", "Unknown impact"),
-                    "rollback_plan": "Automatic rollback available"
-                }
+                    "title": f"Approve architecture for {business_name}",
+                    "description": f"Estimated {validated.timeline_weeks} weeks, ${validated.estimated_cost_usd:,.0f}",
+                    "impact": f"Tech stack: {', '.join(validated.tech_stack[:3])}",
+                } if requires_approval else None,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
             )
-        else:
-            # Staging deployment doesn't need approval (mock)
-            output = {
-                "deployment_url": f"http://staging-{deploy_data.get('version', 'latest')}.example.com"
-            }
+        except Exception as e:
+            logger.error(f"Application generation failed: {e}")
+            return AgentResult(success=False, output=None, error=str(e))
+
+    async def _handle_bug_fix(self, bug_data: Dict[str, Any]) -> AgentResult:
+        description = bug_data.get("description", "")
+        severity = bug_data.get("severity", "medium")
+        logger.info(f"Analyzing bug: {description}")
+
+        prompt = f"""Analyze this bug report and provide a fix plan:
+
+Description: {description}
+Severity: {severity}
+
+Return JSON with:
+- root_cause: root cause analysis
+- fix_summary: summary of the fix
+- estimated_minutes: estimated fix time
+- requires_deploy: boolean
+- tests_to_run: array of test suggestions"""
+
+        try:
+            response = await self.llm.ainvoke(prompt, system_prompt="You are a senior software engineer debugging an issue.")
+            output = json.loads(response)
+            auto_deploy = severity == "critical"
+
+            return AgentResult(
+                success=True,
+                output={**output, "fix_ready": True},
+                requires_approval=not auto_deploy,
+                approval_proposal={
+                    "title": f"Deploy bug fix: {description[:50]}",
+                    "description": output.get("fix_summary", ""),
+                } if not auto_deploy else None,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
+        except Exception as e:
+            logger.error(f"Bug fix failed: {e}")
+            return AgentResult(success=False, output=None, error=str(e))
+
+    async def _implement_feature(self, feature_data: Dict[str, Any]) -> AgentResult:
+        name = feature_data.get("name", "Unknown feature")
+        spec = feature_data.get("specification", {})
+        logger.info(f"Planning feature: {name}")
+
+        prompt = f"""Design implementation plan for this feature:
+
+Name: {name}
+Specification: {json.dumps(spec)}
+
+Return JSON with:
+- implementation_summary: how to implement this
+- estimated_hours: integer
+- changes_database: boolean
+- breaking_changes: boolean
+- files_to_modify: array of file paths
+- test_strategy: testing approach"""
+
+        try:
+            response = await self.llm.ainvoke(prompt, system_prompt="You are a software engineer planning a feature implementation.")
+            output = json.loads(response)
+
+            requires_approval = output.get("changes_database", False) or output.get("breaking_changes", False) or output.get("estimated_hours", 0) > 8
+
             return AgentResult(
                 success=True,
                 output=output,
-                requires_approval=False
+                requires_approval=requires_approval,
+                approval_proposal={
+                    "title": f"Feature: {name}",
+                    "description": output.get("implementation_summary", ""),
+                    "estimated_hours": output.get("estimated_hours", 0),
+                    "breaking_changes": output.get("breaking_changes", False),
+                } if requires_approval else None,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
             )
+        except Exception as e:
+            logger.error(f"Feature planning failed: {e}")
+            return AgentResult(success=False, output=None, error=str(e))
+
+    async def _handle_deployment(self, deploy_data: Dict[str, Any]) -> AgentResult:
+        environment = deploy_data.get("environment", "production")
+        version = deploy_data.get("version", "1.0.0")
+        changelog = deploy_data.get("changelog", "")
+
+        if environment == "production":
+            return AgentResult(
+                success=True,
+                output={"ready_for_deployment": True, "version": version},
+                requires_approval=True,
+                approval_proposal={
+                    "title": f"Deploy to Production: {version}",
+                    "description": changelog or "Standard production deployment",
+                }
+            )
+
+        return AgentResult(
+            success=True,
+            output={"deployment_url": f"staging-{version}", "environment": environment},
+            requires_approval=False,
+        )
