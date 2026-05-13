@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 
 from app.api.dependencies import get_db_session, get_current_user
 from app.config import settings
+import stripe
 from app.models.subscription import Subscription
 from app.models.agent_execution import AgentExecution
 
@@ -127,10 +128,9 @@ def create_checkout_session(
         select(Subscription).where(Subscription.user_id == user_id)
     ).scalar_one_or_none()
 
-    try:
-        import stripe
-        stripe.api_key = settings.STRIPE_API_KEY
+    stripe.api_key = settings.STRIPE_API_KEY
 
+    try:
         if sub and sub.stripe_customer_id:
             customer_id = sub.stripe_customer_id
         else:
@@ -176,13 +176,9 @@ def get_portal_url(
     if not sub or not sub.stripe_customer_id:
         raise HTTPException(status_code=404, detail="No active subscription found")
 
-    try:
-        import stripe
-        stripe.api_key = "sk_test_placeholder"
-        session = stripe.billing_portal.Session.create(
-            customer=sub.stripe_customer_id,
-            return_url="https://autobiz.ai/billing",
-        )
-        return {"url": session.url}
-    except ImportError:
-        return {"url": f"https://stripe.com/billing?customer={sub.stripe_customer_id}"}
+    stripe.api_key = settings.STRIPE_API_KEY
+    session = stripe.billing_portal.Session.create(
+        customer=sub.stripe_customer_id,
+        return_url="https://autobiz.ai/billing",
+    )
+    return {"url": session.url}

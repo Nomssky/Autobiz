@@ -24,46 +24,42 @@ class VectorStore:
 
     def _connect_pinecone(self):
         """Connect to Pinecone."""
-        try:
-            import pinecone
-            api_key = os.environ.get("PINECONE_API_KEY", self.config.get("api_key", ""))
-            environment = os.environ.get("PINECONE_ENV", self.config.get("environment", "us-east1-gcp"))
-            pinecone.init(api_key=api_key, environment=environment)
+        import pinecone
+        api_key = os.environ.get("PINECONE_API_KEY", self.config.get("api_key", ""))
+        if not api_key:
+            raise ValueError("PINECONE_API_KEY not configured")
+        environment = os.environ.get("PINECONE_ENV", self.config.get("environment", "us-east1-gcp"))
+        pinecone.init(api_key=api_key, environment=environment)
 
-            index_name = self.config.get("index_name", self._collection)
-            if index_name not in pinecone.list_indexes():
-                pinecone.create_index(
-                    name=index_name,
-                    dimension=self.config.get("dimension", 1536),
-                    metric=self.config.get("metric", "cosine"),
-                )
-            self._client = pinecone.Index(index_name)
-        except ImportError:
-            print("Warning: pinecone-client not installed. Using mock mode.")
+        index_name = self.config.get("index_name", self._collection)
+        if index_name not in pinecone.list_indexes():
+            pinecone.create_index(
+                name=index_name,
+                dimension=self.config.get("dimension", 1536),
+                metric=self.config.get("metric", "cosine"),
+            )
+        self._client = pinecone.Index(index_name)
 
     def _connect_qdrant(self):
         """Connect to Qdrant."""
-        try:
-            from qdrant_client import QdrantClient
+        from qdrant_client import QdrantClient
+        from qdrant_client.http import models as rest
 
-            url = os.environ.get("QDRANT_URL", self.config.get("url", "http://localhost:6333"))
-            api_key = os.environ.get("QDRANT_API_KEY", self.config.get("api_key", ""))
+        url = os.environ.get("QDRANT_URL", self.config.get("url", "http://localhost:6333"))
+        if not url:
+            raise ValueError("QDRANT_URL not configured")
 
-            self._client = QdrantClient(url=url, api_key=api_key or None)
+        api_key = os.environ.get("QDRANT_API_KEY", self.config.get("api_key", ""))
+        self._client = QdrantClient(url=url, api_key=api_key or None)
 
-            # Create collection if it doesn't exist
-            from qdrant_client.http import models as rest
-
-            if not self._client.collection_exists(self._collection):
-                self._client.create_collection(
-                    collection_name=self._collection,
-                    vectors_config=rest.VectorParams(
-                        size=self.config.get("dimension", 1536),
-                        distance=rest.Distance.COSINE,
-                    ),
-                )
-        except ImportError:
-            print("Warning: qdrant-client not installed. Using mock mode.")
+        if not self._client.collection_exists(self._collection):
+            self._client.create_collection(
+                collection_name=self._collection,
+                vectors_config=rest.VectorParams(
+                    size=self.config.get("dimension", 1536),
+                    distance=rest.Distance.COSINE,
+                ),
+            )
 
     def upsert(self, vectors: List[Dict]) -> bool:
         """Insert or update vectors in the store.

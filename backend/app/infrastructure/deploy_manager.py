@@ -224,8 +224,7 @@ class DeploymentManager:
         """Deploy to Railway.app via API."""
         tokens = self._api_tokens.get("railway")
         if not tokens:
-            logger.warning("RAILWAY_API_TOKEN not set, using simulation mode")
-            return self._simulate_deployment(deployment_id, config, DeploymentTarget.RAILWAY)
+            raise ValueError("RAILWAY_API_TOKEN not configured")
 
         try:
             import requests
@@ -307,8 +306,7 @@ class DeploymentManager:
             )
 
         except ImportError:
-            logger.warning("requests not installed, using Railway simulation mode")
-            return self._simulate_deployment(deployment_id, config, DeploymentTarget.RAILWAY)
+            raise ImportError("requests library required for Railway deployment. Install with: pip install requests")
 
     # ---- Fly.io Deployment ----
 
@@ -316,8 +314,7 @@ class DeploymentManager:
         """Deploy to Fly.io via flyctl."""
         tokens = self._api_tokens.get("flyio")
         if not tokens:
-            logger.warning("FLY_API_TOKEN not set, using simulation mode")
-            return self._simulate_deployment(deployment_id, config, DeploymentTarget.FLY_IO)
+            raise ValueError("FLY_API_TOKEN not configured")
 
         try:
             # Validate flyctl availability
@@ -384,8 +381,7 @@ primary_region = "{config.region}"
                 )
 
         except FileNotFoundError:
-            logger.warning("flyctl not found, using simulation mode")
-            return self._simulate_deployment(deployment_id, config, DeploymentTarget.FLY_IO)
+            raise FileNotFoundError("flyctl not found. Install from: https://fly.io/docs/hands-on/install-flyctl/")
         except subprocess.TimeoutExpired:
             logger.error("flyctl deploy timed out")
             return DeploymentResult(
@@ -405,8 +401,7 @@ primary_region = "{config.region}"
             import docker
             client = docker.from_env()
         except ImportError:
-            logger.warning("docker-py not installed, using simulation mode")
-            return self._simulate_deployment(deployment_id, config, DeploymentTarget.DOCKER)
+            raise ImportError("docker-py not installed. Install with: pip install docker")
 
         try:
             container_name = f"autobiz-{deployment_id[:8]}"
@@ -462,31 +457,27 @@ primary_region = "{config.region}"
             raise
 
     def _deploy_local(self, deployment_id: str, config: DeploymentConfig) -> DeploymentResult:
-        """Local/dev deployment simulation."""
-        return self._simulate_deployment(deployment_id, config, DeploymentTarget.LOCAL)
+        """Run service locally using subprocess."""
+        import subprocess
+        port = config.port or 8000
+        cmd = ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", str(port)]
 
-    def _simulate_deployment(self, deployment_id: str, config: DeploymentConfig,
-                             target: DeploymentTarget) -> DeploymentResult:
-        """Simulated deployment for development/testing."""
-        logger.info(f"[Deploy-SIMULATE] Simulating {target.value} deployment: {config.service_name}")
+        proc = subprocess.Popen(
+            cmd,
+            env={**os.environ, **config.env_vars},
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
 
         return DeploymentResult(
             id=deployment_id,
             status=DeploymentStatus.RUNNING,
-            target=target,
-            url=f"https://{config.service_name or deployment_id[:8]}.simulated.dev",
+            target=DeploymentTarget.LOCAL,
+            url=f"http://localhost:{port}",
             created_at=datetime.utcnow().isoformat(),
             updated_at=datetime.utcnow().isoformat(),
-            logs=[f"[SIMULATE] Starting deployment of {config.service_name}",
-                   f"[SIMULATE] Target: {target.value}",
-                   f"[SIMULATE] Region: {config.region}",
-                   f"[SIMULATE] Container running with {config.memory}MB memory, {config.cpu} CPU"],
-            metadata={
-                "simulated": True,
-                "memory": config.memory,
-                "cpu": config.cpu,
-                "replicas": config.replicas,
-            },
+            logs=[f"Starting local deployment on port {port}"],
+            metadata={"pid": proc.pid, "port": port},
         )
 
     # ---- Helper methods for non-Docker stop/cleanup ----

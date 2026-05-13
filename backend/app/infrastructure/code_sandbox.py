@@ -7,20 +7,20 @@ import json
 import time
 import uuid
 import signal
-import subprocess
+import tarfile
+import io
 import logging
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
-# Try import docker-py
 try:
     import docker
     DOCKER_AVAILABLE = True
 except ImportError:
     DOCKER_AVAILABLE = False
-    logger.warning("docker-py not installed. Code sandbox will run in simulation mode.")
+    logger.warning("docker-py not installed. Code sandbox unavailable.")
 
 
 @dataclass
@@ -106,9 +106,10 @@ class CodeSandbox:
         memory_limit = memory_limit or self.config.memory_limit
 
         if not self.available():
-            return self._simulate_execution(sandbox_id, code, timeout)
+            raise RuntimeError(
+                "Docker is not available. Install docker-py and ensure Docker daemon is running."
+            )
 
-        # Write code to a temp file in Docker
         script_path = "/tmp/sandbox_script.py"
         wrapped_code = self._wrap_code(code)
 
@@ -137,12 +138,14 @@ class CodeSandbox:
 
             self._active_containers[sandbox_id] = container
 
-            # Copy script into container
-            import io
+            # Copy script into container using tarfile
             script_content = wrapped_code.encode('utf-8')
-            container.put_archive("/tmp", io.BytesIO(
-                self._create_tar_archive(script_path, script_content)
-            ))
+            tar_buffer = io.BytesIO()
+            with tarfile.open(fileobj=tar_buffer, mode='w') as tar:
+                info = tarfile.TarInfo(name=script_path.lstrip("/"))
+                info.size = len(script_content)
+                tar.addfile(info, io.BytesIO(script_content))
+            container.put_archive("/tmp", io.BytesIO(tar_buffer.getvalue()))
 
             # Start and monitor
             start_time = time.time()
@@ -280,87 +283,3 @@ __builtins__.__import__ = _safe_import
         for sandbox_id in list(self._active_containers.keys()):
             self.kill(sandbox_id)
 
-    def _simulate_execution(self, sandbox_id: str, code: str, timeout: int) -> SandboxResult:
-        """Simulate execution when Docker is not available (mock mode)."""
-        logger.info(f"[Sandbox-SIMULATE] Executing code (mock mode): {code[:100]}...")
-
-        result = SandboxResult(
-            id=sandbox_id,
-            exit_code=0,
-            stdout="",
-            stderr="",
-            duration_ms=0,
-        )
-
-        # Simple evaluation for trusted test environments
-        try:
-            import io
-            import contextlib
-
-            stdout_capture = io.StringIO()
-            start = time.time()
-
-            with contextlib.redirect_stdout(stdout_capture):
-                exec(compile(code, "<sandbox>", "exec"), {
-                    "__name__": "__sandbox__",
-                    "__builtins__": {
-                        "print": print,
-                        "len": len,
-                        "range": range,
-                        "str": str,
-                        "int": int,
-                        "float": float,
-                        "list": list,
-                        "dict": dict,
-                        "tuple": tuple,
-                        "set": set,
-                        "Exception": Exception,
-                        "ValueError": ValueError,
-                        "TypeError": TypeError,
-                    }
-                })
-
-            result.stdout = stdout_capture.getvalue()
-            result.duration_ms = int((time.time() - start) * 1000)
-        except Exception as e:
-            result.stderr = str(e)
-            result.exit_code = 1
-
-        return result
-
-    @staticmethod
-    def _create_tar_archive(path: str, content: bytes) -> bytes:
-        """Create a minimal tar archive with a single file."""
-        import struct
-
-        def tar_header(name: str, size: int) -> bytes:
-            name_bytes = name.encode('utf-8')
-            header = b''
-            header += name_bytes.ljust(100, b'\0')
-            header += b'0000755\0'  # mode
-            header += b'0000000\0'  # uid
-            header += b'0000000\0'  # gid
-            header += f'{size:011o}'.encode() + b'\0'  # size
-            header += f'{int(time.time()):011o}'.encode() + b'\0'  # mtime
-            header += b' '  # checksum
-            header += b'0'  # typeflag (regular file)
-            header += b'\0' * 100  # linkname
-            header += b'posix\0' * 6  # magic + version
-            header += b'root\x00' * 2  # uname
-            header += b'root\x00' * 2  # gname
-            header += b'\0' * 8  # devmajor
-            header += b'\0' * 8  # devminor
-            header += b'\0' * 155  # prefix
-            # Recalculate checksum
-            checksum = sum(header)
-            header = header[:148] + f'{checksum:06o}'.encode() + b'\0' + header[156:]
-            return header
-
-        size = len(content)
-        padding = 512 - (size % 512) if size % 512 != 0 else 0
-        tar = tar_header(path, size)
-        tar += content
-        tar += b'\0' * padding
-        # End of tar (two empty 512-byte blocks)
-        tar += b'\0' * 1024
-        return tar

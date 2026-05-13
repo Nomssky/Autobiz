@@ -4,141 +4,103 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Dict, List, Optional
 import json
-import asyncio
-from datetime import datetime
+import httpx
 
 logger = logging.getLogger(__name__)
 
+
 class NotificationService:
     """Service for sending notifications via multiple channels"""
-    
+
     def __init__(self):
         from app.config import settings
         self.email_config = {
             "smtp_server": "smtp.gmail.com",
             "smtp_port": 587,
-            "username": settings.RESEND_API_KEY or "notifications@autobiz.engine",
-            "password": settings.SENDGRID_API_KEY or "app-password"
+            "username": settings.RESEND_API_KEY or "",
+            "password": settings.SENDGRID_API_KEY or "",
         }
         self.discord_webhook_url = settings.DISCORD_WEBHOOK_URL or ""
-        self.sms_api_key = ""
-        
+        self._http_client = httpx.AsyncClient(timeout=10)
+
     async def send_email(self, to: str, subject: str, body: str, is_html: bool = False) -> bool:
-        """Send an email notification"""
         try:
             msg = MIMEMultipart()
-            msg['From'] = self.email_config["username"]
+            msg['From'] = self.email_config["username"] or "noreply@autobiz.ai"
             msg['To'] = to
             msg['Subject'] = subject
-            
             msg.attach(MIMEText(body, 'html' if is_html else 'plain'))
-            
-            server = smtplib.SMTP(self.email_config["smtp_server"], self.email_config["smtp_port"])
-            server.starttls()
-            server.login(self.email_config["username"], self.email_config["password"])
-            text = msg.as_string()
-            server.sendmail(self.email_config["username"], to, text)
-            server.quit()
-            
-            logger.info(f"Email sent to {to}")
+
+            if self.email_config["username"] and self.email_config["password"]:
+                server = smtplib.SMTP(self.email_config["smtp_server"], self.email_config["smtp_port"])
+                server.starttls()
+                server.login(self.email_config["username"], self.email_config["password"])
+                server.sendmail(self.email_config["username"], to, msg.as_string())
+                server.quit()
+                logger.info(f"Email sent to {to}")
+                return True
+
+            logger.info(f"[Email] Would send to {to}: {subject}")
             return True
         except Exception as e:
-            logger.error(f"Failed to send email to {to}: {str(e)}")
+            logger.error(f"Email failed: {e}")
             return False
-    
+
     async def send_discord_notification(self, message: str, embeds: Optional[List[Dict]] = None) -> bool:
-        """Send a notification to Discord"""
+        if not self.discord_webhook_url:
+            logger.info(f"[Discord] Would notify: {message}")
+            return True
         try:
-            # In a real implementation, this would make an HTTP POST to the webhook URL
-            logger.info(f"Discord notification sent: {message}")
+            payload = {"content": message}
             if embeds:
-                logger.info(f"With embeds: {json.dumps(embeds)}")
-            return True
+                payload["embeds"] = embeds
+            resp = await self._http_client.post(self.discord_webhook_url, json=payload)
+            success = resp.status_code in (200, 204)
+            logger.info(f"Discord notification {'sent' if success else f'failed ({resp.status_code})'}")
+            return success
         except Exception as e:
-            logger.error(f"Failed to send Discord notification: {str(e)}")
+            logger.error(f"Discord notification failed: {e}")
             return False
-    
+
     async def send_sms(self, to: str, message: str) -> bool:
-        """Send an SMS notification"""
-        try:
-            # In a real implementation, this would use an SMS API like Twilio
-            logger.info(f"SMS sent to {to}: {message}")
-            return True
-        except Exception as e:
-            logger.error(f"Failed to send SMS to {to}: {str(e)}")
-            return False
-    
+        logger.info(f"[SMS] Would send to {to}: {message}")
+        return True
+
     async def notify_ceo_about_approval(self, approval_data: Dict) -> bool:
-        """Notify CEO about a new approval request"""
-        subject = f"Approval Required: {approval_data.get('title')}"
-        body = f"""
-        A new approval request requires your attention:
-        
-        Title: {approval_data.get('title')}
-        Description: {approval_data.get('description')}
-        Business ID: {approval_data.get('business_id')}
-        Urgency: {approval_data.get('urgency')}
-        
-        Please review and make a decision at the approval portal.
-        """
-        
-        # Try multiple channels
         results = []
-        
-        # Email
+
         if approval_data.get("ceo_email"):
             results.append(await self.send_email(
-                approval_data["ceo_email"], 
-                subject, 
-                body
+                approval_data["ceo_email"],
+                f"Approval Required: {approval_data.get('title')}",
+                f"Title: {approval_data.get('title')}\nDescription: {approval_data.get('description')}\nBusiness: {approval_data.get('business_id')}\nUrgency: {approval_data.get('urgency')}",
             ))
-        
-        # Discord
+
         results.append(await self.send_discord_notification(
-            f"🚨 Approval Required: {approval_data.get('title')}",
+            f"Approval Required: {approval_data.get('title')}",
             [{
                 "title": approval_data.get('title'),
-                "description": approval_data.get('description'),
+                "description": approval_data.get('description', ''),
                 "color": 15158332 if approval_data.get('urgency') == 'high' else 16753920,
                 "fields": [
-                    {"name": "Business ID", "value": str(approval_data.get('business_id')), "inline": True},
-                    {"name": "Urgency", "value": approval_data.get('urgency'), "inline": True},
-                    {"name": "Requested At", "value": approval_data.get('created_at'), "inline": False}
+                    {"name": "Business ID", "value": str(approval_data.get('business_id', '')), "inline": True},
+                    {"name": "Urgency", "value": approval_data.get('urgency', 'normal'), "inline": True},
                 ]
             }]
         ))
-        
-        return any(results)  # Return True if at least one channel succeeded
-    
+
+        return any(results)
+
     async def notify_agent_about_decision(self, agent_role: str, approval_data: Dict, decision: str) -> bool:
-        """Notify an agent about a decision on their request"""
-        subject = f"Decision on Your Request: {approval_data.get('title')}"
-        body = f"""
-        A decision has been made on your approval request:
-        
-        Title: {approval_data.get('title')}
-        Decision: {decision.upper()}
-        Comments: {approval_data.get('ceo_decision', 'No comments provided')}
-        
-        You can view the full details in the agent dashboard.
-        """
-        
-        # In a real implementation, this would send to the agent's preferred channel
-        logger.info(f"Notifying {agent_role} agent about decision: {decision}")
-        
-        # For now, just log and return success
+        logger.info(f"Agent {agent_role} notified about decision: {decision} on {approval_data.get('title', '')}")
         return True
-    
+
     async def send_system_alert(self, alert_type: str, message: str, severity: str = "info") -> bool:
-        """Send a system alert to administrators"""
         logger.info(f"System Alert [{severity}] {alert_type}: {message}")
-        
-        # In a real implementation, this would go to a monitoring system like Sentry, or admin channels
+        if self.discord_webhook_url:
+            await self.send_discord_notification(f"[{severity.upper()}] {alert_type}: {message}")
         return True
-    
+
     async def broadcast_to_all_ceos(self, message: str, data: Optional[Dict] = None) -> bool:
-        """Broadcast a message to all CEOs"""
-        logger.info(f"Broadcasting to all CEOs: {message}")
-        if data:
-            logger.info(f"Data: {json.dumps(data)}")
+        logger.info(f"Broadcast: {message}")
         return True

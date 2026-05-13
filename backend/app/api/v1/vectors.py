@@ -51,13 +51,19 @@ def search_vectors(
         )
 
     try:
+        import openai
+        from app.config import settings
+
         vs = get_vector_store()
-        # In production: use real embeddings from OpenAI/Cohere
-        # Here we use mock vectors for demonstration
-        mock_query_vector = [0.1] * 1536
+        client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
+        embedding_response = client.embeddings.create(
+            model="text-embedding-3-small",
+            input=request.query,
+        )
+        query_vector = embedding_response.data[0].embedding
 
         results = vs.search(
-            query_vector=mock_query_vector,
+            query_vector=query_vector,
             top_k=request.top_k,
         )
 
