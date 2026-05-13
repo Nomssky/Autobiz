@@ -36,8 +36,8 @@ def setup_sentry():
                     CeleryIntegration(),
                     SqlalchemyIntegration(),
                 ],
-                traces_sample_rate=settings.get("SENTRY_TRACES_SAMPLE_RATE", 1.0),
-                environment=settings.get("ENVIRONMENT", "production"),
+                traces_sample_rate=getattr(settings, "SENTRY_TRACES_SAMPLE_RATE", 1.0),
+                environment=getattr(settings, "ENVIRONMENT", "production"),
             )
             logger.info("Sentry initialized")
         except ImportError:

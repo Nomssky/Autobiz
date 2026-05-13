@@ -19,11 +19,7 @@ class ApprovalGateway:
         self.notifier = ApprovalNotifier()
 
     def get_db(self) -> Session:
-        db = SessionLocal()
-        try:
-            return db
-        finally:
-            db.close()
+        return SessionLocal()
 
     async def create_approval_request(
         self,

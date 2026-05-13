@@ -349,7 +349,7 @@ class PhaseManager:
     async def _update_phase(self, phase: BusinessPhase, data: Dict[str, Any]):
         """Update business phase in database"""
         try:
-            async with get_db_session() as session:
+            with get_db_session() as session:
                 from sqlalchemy import select
                 result = await session.execute(
                     select(Business).where(Business.id == self.business_id)
@@ -380,7 +380,7 @@ class PhaseManager:
 
         while (datetime.utcnow() - start_time).total_seconds() < timeout:
             try:
-                async with get_db_session() as session:
+                with get_db_session() as session:
                     from app.models import ApprovalRequest
                     from sqlalchemy import select
                     result = await session.execute(
@@ -439,7 +439,7 @@ class PhaseManager:
 
         # Update business record
         try:
-            async with get_db_session() as session:
+            with get_db_session() as session:
                 from sqlalchemy import select
                 result = await session.execute(
                     select(Business).where(Business.id == self.business_id)
@@ -488,7 +488,7 @@ class PhaseManager:
     async def _load_business_config(self) -> Dict[str, Any]:
         """Load business-specific configuration"""
         try:
-            async with get_db_session() as session:
+            with get_db_session() as session:
                 from sqlalchemy import select
                 result = await session.execute(
                     select(Business).where(Business.id == self.business_id)

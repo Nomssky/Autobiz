@@ -1,7 +1,7 @@
 """Build pipeline — orchestrates agent tasks for a new business."""
 from typing import Dict, List
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.models.business import Business
 from app.models.agent_task import AgentTask
@@ -85,7 +85,7 @@ def create_pipeline_approval(
         },
         urgency="high",
         status="pending",
-        expires_at=datetime.utcnow(),
+        expires_at=datetime.utcnow() + timedelta(hours=48),
     )
     db_session.add(approval)
     db_session.flush()

@@ -6,7 +6,7 @@ from uuid import uuid4
 # Add the root directory to the path so we can import backend modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-from backend.app.agents.base_agent import BaseAgent, AgentResult
+from app.agents.base_agent import BaseAgent, AgentResult
 
 # Concrete implementation for testing
 class TestAgent(BaseAgent):

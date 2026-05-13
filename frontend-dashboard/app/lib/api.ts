@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig } from 'axios';
 import { BusinessResponse, ApprovalRequestResponse, MetricSnapshotResponse, RealtimeMetricsResponse } from '@/types';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + '/api/v1';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -25,7 +25,7 @@ class ApiClient {
 
   // Auth
   async login(credentials: { username: string; password: string }) {
-    const { data } = await this.client.post('/auth/token', credentials);
+    const { data } = await this.client.post('/auth/login', credentials);
     return data;
   }
 
