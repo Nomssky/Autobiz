@@ -1,0 +1,18 @@
+{
+  "name": "autobiz-engine",
+  "version": "1.0.0",
+  "description": "AI-powered business builder — CLI tool",
+  "bin": {
+    "autobiz": "./bin/autobiz.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "picocolors": "^1.0.0"
+  },
+  "os": ["darwin", "linux", "win32"],
+  "preferGlobal": true,
+  "keywords": ["ai", "business", "cli", "autobiz"],
+  "license": "MIT"
+}
