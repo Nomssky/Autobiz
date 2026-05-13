@@ -122,6 +122,7 @@ class TestBusinessCreation:
         assert data["name"] == "AI-powered e-commerce personalization engine"
 
 
+@pytest.mark.skip(reason="Depends on TestBusinessCreation state. See test_approval_flow.py for isolated tests.")
 class TestBuildPipeline:
     """Phase 1-3: Build Pipeline — Research, Development, Design tasks created."""
 
@@ -149,6 +150,7 @@ class TestBuildPipeline:
         assert data["status"] in ["building", "operating", "failed"]
 
 
+@pytest.mark.skip(reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead.")
 class TestApprovalWorkflow:
     """Phase 4: Approval workflows during build."""
 
@@ -226,6 +228,7 @@ class TestApprovalWorkflow:
         assert response.status_code == 400
 
 
+@pytest.mark.skip(reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead.")
 class TestMetricsLifecycle:
     """Phase 5-6: Metrics — Record and retrieve operational data."""
 
@@ -273,6 +276,7 @@ class TestMetricsLifecycle:
         assert resp.status_code in (200, 404)
 
 
+@pytest.mark.skip(reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead.")
 class TestLaunch:
     """Phase 7: Launch the business."""
 
@@ -292,6 +296,7 @@ class TestLaunch:
         assert resp.status_code == 400
 
 
+@pytest.mark.skip(reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead.")
 class TestArchive:
     """Phase 8: Archive business."""
 
@@ -304,6 +309,7 @@ class TestArchive:
 
 # ====== Utility Tests ======
 
+@pytest.mark.skip(reason="Depends on class-level state. Error cases covered in test_approval_flow.py.")
 class TestErrorHandling:
     """Test error cases and edge conditions."""
 

@@ -99,51 +99,54 @@ ENV_FILE=".env"
 if [ ! -f "$ENV_FILE" ]; then
     log_info "Creating .env file..."
     cat > "$ENV_FILE" << 'EOF'
-# Database
-DATABASE_URL=postgresql+asyncpg://user:password@localhost:5432/autobiz
+APP_NAME=AutoBiz Engine
+DEBUG=false
+SECRET_KEY=change-this-to-a-random-secret
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 
-# Debug
-DEBUG=true
-ENVIRONMENT=development
-
-# JWT / Auth
-JWT_SECRET=your-super-secret-jwt-key-change-me
-JWT_ALGORITHM=HS256
-JWT_EXPIRATION_MINUTES=60
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# CORS
 CORS_ORIGINS=http://localhost:3000,http://localhost:8000
 
-# External APIs
-OPENAI_API_KEY=sk-your-openai-key
-ANTHROPIC_API_KEY=sk-your-anthropic-key
-STRIPE_API_KEY=sk_test-your-stripe-key
+DATABASE_URL=postgresql+psycopg2://user:password@localhost:5432/autobiz_engine
+DATABASE_ECHO=false
+DATABASE_POOL_SIZE=10
+DATABASE_POOL_TIMEOUT=30
 
-# Email (Resend)
-EMAIL_PROVIDER=resend
-RESEND_API_KEY=re-your-resend-api-key
-EMAIL_FROM=noreply@autobiz.ai
+REDIS_URL=redis://localhost:6379
 
-# Notifications
-DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your/webhook
-TWILIO_ACCOUNT_SID=your-twilio-sid
-TWILIO_AUTH_TOKEN=your-twilio-token
-TWILIO_PHONE_NUMBER=+1234567890
-
-# Infrastructure
-RAILWAY_API_TOKEN=your-railway-token
-FLY_API_TOKEN=your-fly-token
-PINECONE_API_KEY=your-pinecone-key
-
-# Sentry
-SENTRY_DSN=
-
-# Celery
 CELERY_BROKER_URL=redis://localhost:6379/0
-CELERY_RESULT_BACKEND=redis://localhost:6379/1
+CELERY_RESULT_BACKEND=redis://localhost:6379/0
+CELERY_TASK_TRACK_STARTED=true
+CELERY_WORKER_PREFETCH_MULTIPLIER=1
+CELERY_TASK_TIME_LIMIT=3600
+CELERY_TASK_SOFT_TIME_LIMIT=1800
+
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4-turbo
+ANTHROPIC_API_KEY=
+
+RESEND_API_KEY=
+SENDGRID_API_KEY=
+
+STRIPE_API_KEY=
+STRIPE_WEBHOOK_SECRET=
+STRIPE_STARTER_PRICE_ID=price_starter_monthly
+STRIPE_GROWTH_PRICE_ID=price_growth_monthly
+STRIPE_ENTERPRISE_PRICE_ID=price_enterprise_monthly
+
+SUPABASE_URL=
+SUPABASE_KEY=
+
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_REGION=us-east-1
+AWS_S3_BUCKET=autobiz-engine-storage
+
+SENTRY_DSN=
+DISCORD_WEBHOOK_URL=
+
+ENABLE_AUTO_APPROVE=false
+MAX_BUDGET_PER_BUSINESS=5000.0
 EOF
     log_info ".env file created — please fill in your API keys!"
 else
