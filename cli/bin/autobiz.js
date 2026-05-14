@@ -10,8 +10,9 @@
 
 const http = require('http');
 const { spawn, execSync } = require('child_process');
-const { existsSync, readFileSync } = require('fs');
+const { existsSync, readFileSync, mkdirSync } = require('fs');
 const { join, dirname } = require('path');
+const os = require('os');
 const readline = require('readline');
 
 const PKG = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
@@ -19,9 +20,87 @@ const VERSION = PKG.version;
 const API_URL = process.env.AUTOBIZ_API_URL || 'http://localhost:8000/api/v1';
 const WEB_URL = process.env.AUTOBIZ_WEB_URL || 'http://localhost:3000';
 
+// Auto-detect project root
+const PKG_DIR = join(__dirname, '..');
+const PROJECT_ROOT = join(PKG_DIR, '..', '..');
+const BACKEND_DIR = existsSync(join(PROJECT_ROOT, 'backend', 'app', 'main.py'))
+  ? join(PROJECT_ROOT, 'backend')
+  : null;
+
+const AUTOBIZ_DIR = join(os.homedir(), '.autobiz');
+const VENV_DIR = join(AUTOBIZ_DIR, 'venv');
+const REQS_PATH = BACKEND_DIR ? join(BACKEND_DIR, 'requirements.txt') : null;
+
 let pc;
 try { pc = require('picocolors'); } catch {
   pc = { bold: s => s, dim: s => s, green: s => s, red: s => s, yellow: s => s, cyan: s => s, gray: s => s };
+}
+
+// ─── Spinner ──────────────────────────────────────────
+
+function createSpinner(text) {
+  const frames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  let i = 0;
+  const interval = setInterval(() => {
+    process.stdout.write(`\r  ${frames[i]} ${text}`);
+    i = (i + 1) % frames.length;
+  }, 100);
+  return {
+    stop(msg) { clearInterval(interval); process.stdout.write(`\r  ${pc.green('✓')} ${msg || text}\n`); },
+    fail(msg) { clearInterval(interval); process.stdout.write(`\r  ${pc.red('✗')} ${msg || text}\n`); },
+  };
+}
+
+// ─── Auto Venv ────────────────────────────────────────
+
+function ensurePython() {
+  const names = process.platform === 'win32'
+    ? ['python', 'python3', 'py']
+    : ['python3', 'python'];
+
+  for (const name of names) {
+    try {
+      const ver = execSync(`${name} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"`, { stdio: 'pipe' }).toString().trim();
+      if (parseFloat(ver) >= 3.9) return name;
+    } catch {}
+  }
+  throw new Error(
+    'Python 3.9+ is required.\n' +
+    '  Download from: https://www.python.org/downloads/\n' +
+    '  Make sure "python3" (or "python" on Windows) is in your PATH.'
+  );
+}
+
+function ensureVenv(python) {
+  const pip = process.platform === 'win32'
+    ? join(VENV_DIR, 'Scripts', 'pip')
+    : join(VENV_DIR, 'bin', 'pip');
+  const py = process.platform === 'win32'
+    ? join(VENV_DIR, 'Scripts', 'python')
+    : join(VENV_DIR, 'bin', 'python');
+
+  // Create venv if not exists
+  if (!existsSync(py)) {
+    const s = createSpinner('Creating Python virtual environment...');
+    mkdirSync(AUTOBIZ_DIR, { recursive: true });
+    execSync(`${python} -m venv ${VENV_DIR}`, { stdio: 'pipe' });
+    s.stop('Virtual environment created');
+  }
+
+  // Install requirements if not yet
+  const marker = join(VENV_DIR, '.installed');
+  if (!existsSync(marker) && REQS_PATH) {
+    const s = createSpinner('Installing backend dependencies (first run)...');
+    execSync(`${pip} install -r ${REQS_PATH}`, { stdio: 'pipe', cwd: BACKEND_DIR, env: { ...process.env, PIP_NO_INPUT: '1' } });
+    // Mark installed
+    try {
+      readFileSync(REQS_PATH).toString().split('\n').sort().join('\n');
+      execSync(`echo "installed" > "${marker}"`);
+    } catch {}
+    s.stop('Dependencies installed');
+  }
+
+  return { python: py, pip };
 }
 
 // ─── Helpers ──────────────────────────────────────────
@@ -62,14 +141,9 @@ function rlQuestion(query) {
 }
 
 function rlPassword(query) {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    terminal: true,
-  });
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
   return new Promise(resolve => {
     rl.question(query, a => { rl.close(); resolve(a); });
-    // Mask input on supported terminals
     if (rl.terminal && process.stdin.setRawMode) {
       const stdin = process.stdin;
       const onData = c => {
@@ -100,40 +174,45 @@ function startBackend() {
   return new Promise(async (resolve, reject) => {
     if (await isBackendRunning()) return resolve();
 
-    const root = join(__dirname, '..', '..', '..');
-    const backendDir = join(root, 'backend');
-
     // Try Docker
     try {
-      execSync('docker compose ps 2>/dev/null', { cwd: root, stdio: 'pipe' });
+      execSync('docker compose ps 2>/dev/null', { cwd: PROJECT_ROOT, stdio: 'pipe' });
       log(`Starting backend with Docker...`, 'dim');
-      execSync('docker compose up -d backend', { cwd: root, stdio: 'pipe' });
+      execSync('docker compose up -d', { cwd: PROJECT_ROOT, stdio: 'pipe' });
       await waitForBackend(60, resolve, reject);
       return;
     } catch {}
 
-    // Try uvicorn
-    const python = process.platform === 'win32' ? 'python' : 'python3';
-    try {
-      execSync(`${python} -c "import uvicorn" 2>/dev/null`, { stdio: 'pipe' });
-    } catch {
+    // No Docker — use auto venv
+    if (!BACKEND_DIR) {
       reject(new Error(
-        `Cannot start backend. Install deps:\n  cd ${backendDir} && pip install -r requirements.txt\n` +
-        `Or use: docker compose up -d`
+        'Backend not found. Clone the repo:\n' +
+        '  git clone https://github.com/Nomssky/Autobiz.git\n' +
+        '  cd Autobiz/cli && npm link\n' +
+        'Or use Docker: docker compose up -d'
       ));
       return;
     }
 
-    log(`Starting backend...`, 'dim');
-    const proc = spawn(python, ['-m', 'uvicorn', 'app.main:app', '--port', '8000'], {
-      cwd: backendDir, stdio: 'pipe', env: { ...process.env },
-    });
-    proc.stdout.on('data', () => {});
-    proc.stderr.on('data', () => {});
+    try {
+      const python = ensurePython();
+      const venv = ensureVenv(python);
+      log(`Starting backend...`, 'dim');
 
-    process.on('exit', () => { try { proc.kill(); } catch {} });
+      const proc = spawn(venv.python, ['-m', 'uvicorn', 'app.main:app', '--port', '8000'], {
+        cwd: BACKEND_DIR,
+        stdio: 'pipe',
+        env: { ...process.env, PYTHONPATH: BACKEND_DIR },
+      });
+      proc.stdout.on('data', () => {});
+      proc.stderr.on('data', () => {});
 
-    await waitForBackend(30, resolve, reject);
+      process.on('exit', () => { try { proc.kill(); } catch {} });
+
+      await waitForBackend(60, resolve, reject);
+    } catch (e) {
+      reject(e);
+    }
   });
 }
 
