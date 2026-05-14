@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type SettingsModel struct {
@@ -97,7 +98,7 @@ func (m SettingsModel) Update(msg tea.Msg) (SettingsModel, tea.Cmd) {
 		if msg.Err != "" {
 			m.errMsg = msg.Err
 		} else {
-			m.successMsg = "✓ Settings saved to .env"
+			m.successMsg = "✓ Saved to .env"
 		}
 	case SettingsErrMsg:
 		m.errMsg = msg.Err
@@ -147,7 +148,7 @@ func (m SettingsModel) handleEdit(msg tea.KeyMsg) (SettingsModel, tea.Cmd) {
 	case "enter":
 		if m.env != nil && m.env.Flat != nil {
 			m.env.Flat[m.editingKey] = m.editBuf
-			m.successMsg = fmt.Sprintf("✎ %s updated (press s to save all)", m.editingKey)
+			m.successMsg = fmt.Sprintf("✎ %s updated", m.editingKey)
 		}
 		m.editingKey = ""
 	case "esc":
@@ -227,13 +228,15 @@ func (m SettingsModel) sortedKeys(data map[string]string) []string {
 func (m SettingsModel) View() string {
 	var sb strings.Builder
 
-	sb.WriteString(StyleTitle.Render("Settings"))
+	sb.WriteString(StyleTitle.Render("⚙ Settings"))
 	sb.WriteString("\n\n")
 
-	// ── Integration Status ──
-	sb.WriteString(styleSection("Integration Status"))
+	// ── Integration Status Panel ──
+	var statusRows []string
+	statusRows = append(statusRows, StyleSectionHeader.Render("Integration Status"))
+
 	if m.status != nil {
-		rows := []struct {
+		services := []struct {
 			name  string
 			state string
 			extra string
@@ -245,30 +248,20 @@ func (m SettingsModel) View() string {
 			{"Notifications", m.status.Notifications.Status, ""},
 			{"Redis", m.status.Redis.Status, ""},
 		}
-		for _, r := range rows {
-			dot := "○"
-			sty := StyleMuted
-			switch r.state {
-			case "ok", "connected", "configured":
-				dot = "●"
-				sty = StyleSuccess
-			case "error", "missing_api_key":
-				dot = "●"
-				sty = StyleError
-			case "not_configured":
-				dot = "○"
-				sty = StyleDim
+		for _, s := range services {
+			line := fmt.Sprintf("  %s  %s", StatusDot(s.state), s.name)
+			if s.extra != "" {
+				line += StyleDim.Render(" · " + s.extra)
 			}
-			line := fmt.Sprintf("  %s %s", sty.Render(dot), sty.Render(r.name))
-			if r.extra != "" {
-				line += StyleDim.Render(" · " + r.extra)
-			}
-			sb.WriteString(line + "\n")
+			statusRows = append(statusRows, line)
 		}
 	} else {
-		sb.WriteString("  Loading...\n")
+		statusRows = append(statusRows, "  Loading...")
 	}
-	sb.WriteString("\n")
+
+	statusPanel := lipgloss.JoinVertical(lipgloss.Left, statusRows...)
+	sb.WriteString(StylePanel.Render(statusPanel))
+	sb.WriteString("\n\n")
 
 	// ── Configuration Groups ──
 	if m.env != nil && m.env.Env != nil {
@@ -277,49 +270,50 @@ func (m SettingsModel) View() string {
 			data := m.env.Env[group]
 			isGroupActive := gi == m.cursorGroup
 
+			// Group header
+			header := StyleSectionHeader.Render(group)
 			if isGroupActive {
-				sb.WriteString(StyleHighlight.Render(group))
-			} else {
-				sb.WriteString(StyleInfo.Render(group))
+				header = StyleHighlight.Render("▸ " + group)
 			}
+			sb.WriteString(header)
 			sb.WriteString("\n")
 
+			// Group lines
 			keys := m.sortedKeys(data)
 			for ki, key := range keys {
 				val := data[key]
 				isActive := isGroupActive && ki == m.cursorKey
-
-				prefix := "  "
-				if isActive {
-					prefix = " ▸"
-				}
-
-				keyLabel := StyleMuted.Render(key + ":")
-				valDisplay := val
+				displayVal := val
 				if val == "" {
-					valDisplay = StyleDim.Render("-")
+					displayVal = StyleDim.Render("—")
 				}
 
+				// Check if this key is being edited
 				if isActive && m.editingKey == key {
-					// Show editing state
-					sb.WriteString(fmt.Sprintf(" %s %s %s█\n", prefix, keyLabel, StyleHighlight.Render(m.editBuf)))
-					sb.WriteString(fmt.Sprintf("        %s\n", StyleDim.Render("enter confirm  ·  esc cancel")))
-				} else if isActive {
-					sb.WriteString(fmt.Sprintf(" %s %s %s\n", prefix, keyLabel, valDisplay))
-					sb.WriteString(fmt.Sprintf("        %s\n", StyleDim.Render("enter to edit")))
+					prefix := StyleHighlight.Render("  ✎")
+					sb.WriteString(fmt.Sprintf("%s %s\n", prefix, StyleMuted.Render(key)))
+					sb.WriteString(fmt.Sprintf("     %s█\n", StyleCursor.Render(m.editBuf)))
+					sb.WriteString(fmt.Sprintf("     %s\n", StyleDim.Render("enter confirm · esc cancel")))
 				} else {
-					sb.WriteString(fmt.Sprintf(" %s  %s %s\n", prefix, keyLabel, valDisplay))
+					prefix := "   "
+					if isActive {
+						prefix = StyleCursor.Render("  ▸")
+					}
+					sb.WriteString(fmt.Sprintf("%s %s  %s\n", prefix, StyleMuted.Render(key), displayVal))
+					if isActive {
+						sb.WriteString(fmt.Sprintf("     %s\n", StyleDim.Render("enter to edit")))
+					}
 				}
 			}
 			sb.WriteString("\n")
 		}
 	} else {
-		sb.WriteString("  Loading config...\n\n")
+		sb.WriteString(StyleDim.Render("  Loading configuration...") + "\n\n")
 	}
 
-	// Test result
+	// ── Action Feedback ──
 	if m.testing {
-		sb.WriteString(StyleInfo.Render("  Testing LLM...") + "\n")
+		sb.WriteString(StyleInfo.Render("  Testing LLM connection...") + "\n")
 	}
 	if m.testRes != nil {
 		if m.testRes.Success {
@@ -327,9 +321,7 @@ func (m SettingsModel) View() string {
 		} else {
 			sb.WriteString(StyleError.Render(fmt.Sprintf("  ✗ LLM: %s", m.testRes.Error)) + "\n")
 		}
-		sb.WriteString("\n")
 	}
-
 	if m.errMsg != "" {
 		sb.WriteString(StyleError.Render("  ✗ "+m.errMsg) + "\n")
 	}
@@ -340,10 +332,7 @@ func (m SettingsModel) View() string {
 		sb.WriteString(StyleInfo.Render("  Saving...") + "\n")
 	}
 
-	sb.WriteString("\n" + StyleDim.Render("↑↓ navigate  ·  enter edit  ·  s save  ·  t test LLM  ·  R refresh"))
+	// ── Help Bar ──
+	sb.WriteString("\n" + StyleHelp.Render("↑↓ navigate · enter edit · s save · t test LLM · R refresh"))
 	return sb.String()
-}
-
-func styleSection(title string) string {
-	return StyleInfo.Render(title) + "\n" + StyleDim.Render(strings.Repeat("─", 40)) + "\n"
 }

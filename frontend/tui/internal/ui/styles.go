@@ -2,43 +2,50 @@ package ui
 
 import "github.com/charmbracelet/lipgloss"
 
-// Palette
+// ── Color Palette ──
 var (
-	colPurple  = lipgloss.Color("#7B59E0")
-	colGreen   = lipgloss.Color("#73F59F")
-	colRed     = lipgloss.Color("#E06C75")
-	colBlue    = lipgloss.Color("#61AFEF")
-	colMuted   = lipgloss.Color("#666666")
-	colDim     = lipgloss.Color("#444444")
-	colWhite   = lipgloss.Color("#DDDDDD")
-	colYellow  = lipgloss.Color("#E5C07B")
+	colPrimary = lipgloss.Color("#7C3AED")
+	colSuccess = lipgloss.Color("#10B981")
+	colError   = lipgloss.Color("#EF4444")
+	colWarn    = lipgloss.Color("#F59E0B")
+	colInfo    = lipgloss.Color("#3B82F6")
+	colWhite   = lipgloss.Color("#F8FAFC")
+	colMuted   = lipgloss.Color("#94A3B8")
+	colDim     = lipgloss.Color("#475569")
+	colBg      = lipgloss.Color("#1E293B")
+	colBgDark  = lipgloss.Color("#0F172A")
+	colBorder  = lipgloss.Color("#334155")
+	colSelBg   = lipgloss.Color("#1E1B4B")
 )
 
-// Base styles
+// ── Text Styles ──
 var (
 	StyleTitle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(colPurple)
+			Foreground(colWhite).
+			Background(colPrimary).
+			Padding(0, 2)
 
-	StyleSubtitle = lipgloss.NewStyle().
-			Foreground(colMuted).
-			Italic(true)
+	StyleSectionHeader = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(colPrimary).
+				Padding(0, 1)
 
 	StyleHighlight = lipgloss.NewStyle().
-			Foreground(colPurple).
+			Foreground(colPrimary).
 			Bold(true)
 
 	StyleSuccess = lipgloss.NewStyle().
-			Foreground(colGreen)
+			Foreground(colSuccess)
 
 	StyleError = lipgloss.NewStyle().
-			Foreground(colRed)
+			Foreground(colError)
 
 	StyleInfo = lipgloss.NewStyle().
-			Foreground(colBlue)
+			Foreground(colInfo)
 
 	StyleWarn = lipgloss.NewStyle().
-			Foreground(colYellow)
+			Foreground(colWarn)
 
 	StyleMuted = lipgloss.NewStyle().
 			Foreground(colMuted)
@@ -47,67 +54,49 @@ var (
 			Foreground(colDim)
 
 	StyleSelected = lipgloss.NewStyle().
-			Foreground(colPurple).
+			Foreground(colPrimary).
 			Bold(true)
 
 	StyleNormal = lipgloss.NewStyle().
 			Foreground(colWhite)
+)
 
-	// Tab bar
+// ── Tab Bar ──
+var (
 	StyleActiveTab = lipgloss.NewStyle().
-			Foreground(colPurple).
-			Bold(true).
-			Underline(true).
-			Padding(0, 2)
+			Foreground(colWhite).
+			Background(colPrimary).
+			Padding(0, 2).
+			Bold(true)
 
 	StyleInactiveTab = lipgloss.NewStyle().
 				Foreground(colMuted).
 				Padding(0, 2)
+)
 
-	// Input field
-	StyleInputLabel = lipgloss.NewStyle().
-			Foreground(colBlue)
+// ── Panel / Card ──
+var (
+	StylePanel = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colBorder).
+			Padding(1, 2).
+			Width(50)
 
-	StyleInputActive = lipgloss.NewStyle().
-				Foreground(colWhite).
-				BorderStyle(lipgloss.NormalBorder()).
-				BorderBottom(true).
-				BorderForeground(colPurple).
-				Width(36)
-
-	StyleInputInactive = lipgloss.NewStyle().
-				Foreground(colMuted).
-				BorderStyle(lipgloss.NormalBorder()).
-				BorderBottom(true).
-				BorderForeground(colDim).
-				Width(36)
-
-	// Stat card
 	StyleStatCard = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colDim).
+			BorderForeground(colBorder).
 			Padding(0, 2).
-			Width(14)
+			Width(16)
 
-	StyleStatValue = lipgloss.NewStyle().
-			Foreground(colGreen).
-			Bold(true)
-
-	// Help bar
-	StyleHelp = lipgloss.NewStyle().
-			Foreground(colDim)
-
-	// App frame
 	StyleApp = lipgloss.NewStyle().
-			Padding(1, 3)
+			Padding(1, 2).
+			Background(colBgDark)
+)
 
-	// Urgency badges
-	StyleUrgencyHigh   = lipgloss.NewStyle().Foreground(colRed).Bold(true)
-	StyleUrgencyNormal = lipgloss.NewStyle().Foreground(colMuted)
-
-	// Status badges
-	StyleStatusBuilding  = lipgloss.NewStyle().Foreground(colYellow)
-	StyleStatusOperating = lipgloss.NewStyle().Foreground(colGreen)
+// ── Status Badges ──
+var (
+	StyleStatusBuilding  = lipgloss.NewStyle().Foreground(colWarn).Bold(true)
+	StyleStatusOperating = lipgloss.NewStyle().Foreground(colSuccess).Bold(true)
 	StyleStatusArchived  = lipgloss.NewStyle().Foreground(colMuted)
 )
 
@@ -124,9 +113,37 @@ func StatusStyle(s string) lipgloss.Style {
 	}
 }
 
+// ── Help Bar ──
+var StyleHelp = lipgloss.NewStyle().Foreground(colDim)
+
+// ── Input Fields ──
+var (
+	StyleInputLabel = lipgloss.NewStyle().Foreground(colInfo).Bold(true)
+	StyleInputValue = lipgloss.NewStyle().Foreground(colWhite)
+	StyleCursor     = lipgloss.NewStyle().Foreground(colPrimary).Bold(true)
+)
+
+// ── Approval Urgency ──
+var (
+	StyleUrgencyHigh   = lipgloss.NewStyle().Foreground(colError).Bold(true)
+	StyleUrgencyNormal = lipgloss.NewStyle().Foreground(colMuted)
+)
+
 func UrgencyStyle(u string) lipgloss.Style {
 	if u == "high" || u == "HIGH" {
 		return StyleUrgencyHigh
 	}
 	return StyleUrgencyNormal
+}
+
+// ── Background colors for status dots ──
+func StatusDot(s string) string {
+	switch s {
+	case "ok", "connected", "configured":
+		return StyleSuccess.Render("●")
+	case "error", "missing_api_key":
+		return StyleError.Render("●")
+	default:
+		return StyleDim.Render("○")
+	}
 }

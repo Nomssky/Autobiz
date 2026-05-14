@@ -197,9 +197,11 @@ type IntegrationStatus struct {
 }
 
 type ServiceStatus struct {
-	Status string `json:"status"`
-	Error  string `json:"error,omitempty"`
-	URL    string `json:"url,omitempty"`
+	Status   string   `json:"status"`
+	Error    string   `json:"error,omitempty"`
+	URL      string   `json:"url,omitempty"`
+	KeyPrefix string  `json:"key_prefix,omitempty"`
+	Channels []string `json:"channels,omitempty"`
 }
 
 type LLMStatus struct {

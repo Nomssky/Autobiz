@@ -147,7 +147,7 @@ func (m AuthModel) View() string {
 	var sb strings.Builder
 
 	sb.WriteString(StyleTitle.Render("AutoBiz Engine") + "\n")
-	sb.WriteString(StyleSubtitle.Render("AI-powered autonomous business platform") + "\n\n")
+	sb.WriteString(StyleMuted.Render("build AI-powered businesses") + "\n\n")
 
 	field := func(label string, input textinput.Model, active bool) string {
 		lStyle := StyleInputLabel
