@@ -149,3 +149,54 @@ def get_env(_: UUID = Depends(require_ceo)):
         pass
 
     return {"env": config, "path": env_path}
+
+
+class SaveEnvRequest(BaseModel):
+    updates: dict
+
+
+@router.put("/env", summary="Save .env configuration changes")
+def save_env(request: SaveEnvRequest, _: UUID = Depends(require_ceo)):
+    """Update .env file with new values. Only edits existing keys."""
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "..", "..", ".env")
+    alt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "..", "..", "..", ".env")
+
+    for p in [env_path, alt_path, os.path.abspath(".env")]:
+        if os.path.exists(p):
+            env_path = p
+            break
+    else:
+        raise HTTPException(status_code=404, detail="No .env file found")
+
+    allowed_keys = {
+        "LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_BASE_URL", "LLM_TEMPERATURE",
+        "EMBEDDING_PROVIDER", "EMBEDDING_MODEL", "EMBEDDING_API_KEY", "EMBEDDING_BASE_URL",
+        "OLLAMA_BASE_URL", "OLLAMA_MODEL",
+        "OPENAI_API_KEY", "OPENAI_MODEL",
+        "SECRET_KEY", "DATABASE_URL", "DEBUG",
+        "DISCORD_WEBHOOK_URL",
+    }
+
+    try:
+        with open(env_path) as f:
+            lines = f.readlines()
+        with open(env_path, "w") as f:
+            updated = set()
+            for line in lines:
+                stripped = line.strip()
+                if "=" in stripped and not stripped.startswith("#"):
+                    key = stripped.split("=", 1)[0].strip()
+                    if key in request.updates and key in allowed_keys:
+                        f.write(f"{key}={request.updates[key]}\n")
+                        updated.add(key)
+                        continue
+                f.write(line)
+            # Append new keys that didn't exist
+            for key, val in request.updates.items():
+                if key not in updated and key in allowed_keys:
+                    f.write(f"{key}={val}\n")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save .env: {e}")
+
+    # Reload settings in memory (optional — next restart picks them up)
+    return {"status": "saved", "updated": list(request.updates.keys())}

@@ -240,6 +240,19 @@ func (c *Client) GetEnv() (*EnvConfig, error) {
 	return &out, json.NewDecoder(resp.Body).Decode(&out)
 }
 
+func (c *Client) SaveEnv(env map[string]string) error {
+	body := map[string]any{"updates": env}
+	resp, err := c.do("PUT", "/settings/env", body)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("save failed (%d)", resp.StatusCode)
+	}
+	return nil
+}
+
 func (c *Client) TestLLM(provider, model, apiKey, baseURL string) (*TestLLMResult, error) {
 	body := map[string]string{
 		"provider": provider,
