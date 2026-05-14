@@ -10,7 +10,7 @@
 
 const http = require('http');
 const { spawn, execSync } = require('child_process');
-const { existsSync, readFileSync, mkdirSync } = require('fs');
+const { existsSync, readFileSync, mkdirSync, realpathSync } = require('fs');
 const { join, dirname } = require('path');
 const os = require('os');
 const readline = require('readline');
@@ -20,12 +20,20 @@ const VERSION = PKG.version;
 const API_URL = process.env.AUTOBIZ_API_URL || 'http://localhost:8000/api/v1';
 const WEB_URL = process.env.AUTOBIZ_WEB_URL || 'http://localhost:3000';
 
-// Auto-detect project root
-const PKG_DIR = join(__dirname, '..');
-const PROJECT_ROOT = join(PKG_DIR, '..', '..');
-const BACKEND_DIR = existsSync(join(PROJECT_ROOT, 'backend', 'app', 'main.py'))
-  ? join(PROJECT_ROOT, 'backend')
-  : null;
+// Auto-detect project root (resolve symlinks for global install)
+const { realpathSync } = require('fs');
+const PKG_DIR = realpathSync(join(__dirname, '..'));
+function findBackend(from) {
+  for (let i = 0; i < 5; i++) {
+    const candidate = join(from, 'backend', 'app', 'main.py');
+    if (existsSync(candidate)) return join(from, 'backend');
+    from = join(from, '..');
+  }
+  return null;
+}
+const BACKEND_DIR = process.env.AUTOBIZ_BACKEND_DIR
+  ? join(process.env.AUTOBIZ_BACKEND_DIR)
+  : findBackend(PKG_DIR);
 
 const AUTOBIZ_DIR = join(os.homedir(), '.autobiz');
 const VENV_DIR = join(AUTOBIZ_DIR, 'venv');
