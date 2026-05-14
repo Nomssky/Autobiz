@@ -8,7 +8,7 @@ from enum import Enum
 class BusinessBase(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    ceo_id: UUID
+    ceo_id: Optional[UUID] = None
     status: Optional[str] = "building"
     current_phase: Optional[str] = "initialization"
     metadata: Optional[dict] = {}
