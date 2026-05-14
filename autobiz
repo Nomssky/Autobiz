@@ -104,6 +104,9 @@ start_backend() {
 
 # ─── Cleanup on exit ─────────────────────────────────────
 cleanup() {
+  if [ -n "$DASHBOARD_PID" ]; then
+    kill "$DASHBOARD_PID" 2>/dev/null || true
+  fi
   if [ -n "$BACKEND_PID" ]; then
     kill "$BACKEND_PID" 2>/dev/null || true
     ok "Backend stopped"
@@ -116,10 +119,31 @@ if [[ "$1" == "--web" || "$1" == "-w" ]]; then
   if ! curl -sf http://localhost:8000/health > /dev/null 2>&1; then
     start_backend
   fi
+
+  # Auto-start dashboard
+  if command -v npm &>/dev/null; then
+    DASHBOARD_DIR="$ROOT/frontend/dashboard"
+    if [ ! -d "$DASHBOARD_DIR/node_modules" ]; then
+      info "Installing dashboard dependencies..."
+      cd "$DASHBOARD_DIR" && npm install --silent && cd "$ROOT"
+      ok "Dashboard dependencies installed"
+    fi
+    info "Starting web dashboard on http://localhost:3000..."
+    cd "$DASHBOARD_DIR" && npm run dev -- -p 3000 > /dev/null 2>&1 &
+    DASHBOARD_PID=$!
+    cd "$ROOT"
+    sleep 3
+  fi
+
   echo ""
   echo -e "  ${GREEN}🌐  Web Dashboard:${NC} ${BOLD}http://localhost:3000${NC}"
   echo -e "  ${DIM}📡  API: http://localhost:8000${NC}"
+  echo -e "  ${DIM}Press Ctrl+C to stop${NC}"
   echo ""
+
+  # Wait for either process
+  wait $BACKEND_PID 2>/dev/null
+  [ -n "$DASHBOARD_PID" ] && kill "$DASHBOARD_PID" 2>/dev/null
   exit 0
 fi
 
