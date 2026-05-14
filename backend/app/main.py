@@ -51,6 +51,15 @@ setup_sentry()
 async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle hook."""
     logger.info("Starting up AutoBiz Engine API...")
+    try:
+        from sqlalchemy import inspect as sa_inspect
+        engine = get_engine()
+        if "sqlite" in str(engine.url):
+            from app.models.base import Base
+            Base.metadata.create_all(bind=engine)
+            logger.info("SQLite tables created automatically")
+    except Exception as e:
+        logger.warning(f"Auto table creation skipped: {e}")
     yield
     logger.info("Shutting down AutoBiz Engine API...")
 
