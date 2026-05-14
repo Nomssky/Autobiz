@@ -80,6 +80,16 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			tabKeys := map[string]int{"1": 0, "2": 1, "3": 2, "4": 3, "5": 4}
 			if t, ok := tabKeys[msg.String()]; ok {
 				m.activeTab = t
+				switch t {
+				case 1:
+					return m, m.biz.Init()
+				case 2:
+					return m, m.approvals.Init()
+				case 3:
+					return m, m.metrics.Init()
+				case 4:
+					return m, m.settings.Init()
+				}
 				return m, nil
 			}
 		}
@@ -104,6 +114,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.auth, cmd = m.auth.Update(msg)
 	case screenDashboard:
 		switch m.activeTab {
+		case 0:
+			if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "n" {
+				m.activeTab = 1
+			}
 		case 1:
 			m.biz, cmd = m.biz.Update(msg)
 		case 2:
@@ -112,10 +126,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.metrics, cmd = m.metrics.Update(msg)
 		case 4:
 			m.settings, cmd = m.settings.Update(msg)
-		default:
-			if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "n" {
-				m.activeTab = 1
-			}
 		}
 	}
 
