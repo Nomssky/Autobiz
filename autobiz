@@ -82,7 +82,8 @@ start_backend() {
   PYTHONPATH="$BACKEND_DIR" \
   DEBUG=true DATABASE_URL=sqlite:///./autobiz_dev.db \
     "$BACKEND_DIR/venv/bin/uvicorn" app.main:app \
-    --host 0.0.0.0 --port 8000 --log-level warning &
+    --host 0.0.0.0 --port 8000 --log-level warning \
+    > /dev/null 2>&1 &
   cd "$ROOT"
   BACKEND_PID=$!
 
@@ -122,7 +123,7 @@ if [[ "$1" == "--web" || "$1" == "-w" ]]; then
   exit 0
 fi
 
-# ─── TUI mode (default) ──────────────────────────────────
+# ─── Interactive CLI mode (default) ──────────────────────
 echo ""
 echo -e "  ${BOLD}AutoBiz Engine${NC} ${DIM}— build AI-powered businesses${NC}"
 echo ""
@@ -132,15 +133,15 @@ if ! curl -sf http://localhost:8000/health > /dev/null 2>&1; then
   start_backend
 fi
 
-# Check if TUI binary exists
-if [ -f "$TUI_BIN" ]; then
-  "$TUI_BIN"
+# Launch Node.js CLI (matches backend API, auto-venv, interactive menus)
+if [ -f "$CLI_BIN" ]; then
+  # Pass through any autobiz arguments (e.g., direct idea)
+  node "$CLI_BIN" "$@"
+elif has_command node; then
+  warn "CLI script not found, trying npx..."
+  npx --yes github:Nomssky/Autobiz
 else
-  warn "TUI not found, falling back to CLI..."
-  if [ -f "$CLI_BIN" ]; then
-    node "$CLI_BIN"
-  else
-    echo -e "  ${YELLOW}⚠${NC} No TUI or CLI found. Backend is running at http://localhost:8000"
-    echo -e "  ${DIM}  Start the frontend dashboard:${NC} cd frontend/dashboard && npm run dev"
-  fi
+  echo -e "  ${YELLOW}⚠${NC} Node.js is required for the CLI."
+  echo -e "  ${DIM}  Backend is running at http://localhost:8000${NC}"
+  echo -e "  ${DIM}  Install Node.js and run:${NC} npx github:Nomssky/Autobiz"
 fi
