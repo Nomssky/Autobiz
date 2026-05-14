@@ -158,20 +158,24 @@ function rlQuestion(query) {
 }
 
 function rlPassword(query) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
   return new Promise(resolve => {
-    rl.question(query, a => { rl.close(); resolve(a); });
-    if (rl.terminal && process.stdin.setRawMode) {
-      const stdin = process.stdin;
-      const onData = c => {
-        const str = String(c);
-        if (str === '\x03') { rl.close(); process.exit(0); }
-        if (str === '\x7f') rl.line = rl.line.slice(0, -1);
-        else if (str.length === 1) rl.line += str;
-        rl._refreshLine();
-      };
-      stdin.on('data', onData);
-      rl.on('close', () => stdin.removeListener('data', onData));
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    const cb = (a) => { rl.close(); resolve(a); };
+    // Try to hide input on Unix-like systems
+    try {
+      const { execSync } = require('child_process');
+      execSync('stty -echo 2>/dev/null', { stdio: 'pipe' });
+      rl.question(query, a => {
+        try { execSync('stty echo 2>/dev/null', { stdio: 'pipe' }); } catch {}
+        cb(a);
+      });
+      rl.on('SIGINT', () => {
+        try { execSync('stty echo 2>/dev/null', { stdio: 'pipe' }); } catch {}
+        process.exit(0);
+      });
+    } catch {
+      // Fallback: show input if stty unavailable
+      rl.question(query, cb);
     }
   });
 }
