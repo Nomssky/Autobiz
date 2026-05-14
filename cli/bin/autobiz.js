@@ -21,7 +21,6 @@ const API_URL = process.env.AUTOBIZ_API_URL || 'http://localhost:8000/api/v1';
 const WEB_URL = process.env.AUTOBIZ_WEB_URL || 'http://localhost:3000';
 
 // Auto-detect project root (resolve symlinks for global install)
-const { realpathSync } = require('fs');
 const PKG_DIR = realpathSync(join(__dirname, '..'));
 function findBackend(from) {
   for (let i = 0; i < 5; i++) {
