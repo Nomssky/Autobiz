@@ -3,6 +3,8 @@
 from typing import Any, Dict
 from uuid import UUID
 
+from app.config import settings
+
 
 def create_agent_configs(business_id: UUID) -> Dict[str, Dict[str, Any]]:
     """Create CrewAI agent configurations with roles and tools."""
@@ -94,11 +96,20 @@ def create_agent_configs(business_id: UUID) -> Dict[str, Dict[str, Any]]:
 
 def get_manager_llm_config() -> Dict[str, Any]:
     """Get the manager LLM configuration for hierarchical CrewAI processes."""
-    return {
-        "model": "gpt-4-turbo",
+    config: Dict[str, Any] = {
+        "model": settings.LLM_MODEL or settings.OPENAI_MODEL or "gpt-4-turbo",
         "temperature": 0.3,
         "max_tokens": 4096,
     }
+    # Add base_url for custom OpenAI-compatible providers
+    base_url = settings.LLM_BASE_URL or ""
+    if base_url:
+        config["base_url"] = base_url
+    # Add api_key if set
+    api_key = settings.LLM_API_KEY or settings.OPENAI_API_KEY or ""
+    if api_key:
+        config["api_key"] = api_key
+    return config
 
 
 def get_crew_config(business_id: UUID, crew_type: str = "hierarchical") -> Dict[str, Any]:

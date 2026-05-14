@@ -12,8 +12,8 @@ from app.agents.marketer import MarketerAgent
 from app.agents.researcher import ResearcherAgent
 from app.agents.support import SupportAgent
 from app.approval.gateway import approval_gateway
+from app.approval.notifier import ApprovalNotifier
 from app.database import get_db_session
-from app.infrastructure.notification_service import NotificationService
 from app.models import Business
 
 logger = logging.getLogger(__name__)
@@ -38,12 +38,12 @@ class PhaseManager:
     def __init__(self, business_id: UUID):
         self.business_id = business_id
         self.agents: Dict[str, Any] = {}
-        self.notifier = NotificationService()
+        self.notifier = ApprovalNotifier()
         self._operation_active = False
 
     async def initialize_agents(self):
         """Initialize all AI agents for this business"""
-        config = await self._load_business_config()
+        config = self._load_business_config()
 
         self.agents = {
             "researcher": ResearcherAgent(self.business_id, config.get("researcher", {})),
@@ -77,7 +77,7 @@ class PhaseManager:
             return {"success": False, "phase": "research", "error": research_result.error}
 
         phase_results["research"] = research_result.output
-        await self._update_phase(BusinessPhase.RESEARCH, research_result.output)
+        self._update_phase(BusinessPhase.RESEARCH, research_result.output)
 
         # --- Phase 2: Development ---
         logger.info("Phase 2: Development")
@@ -101,7 +101,7 @@ class PhaseManager:
             return {"success": False, "phase": "development", "error": dev_result.error}
 
         phase_results["development"] = dev_result.output
-        await self._update_phase(BusinessPhase.DEVELOPMENT, dev_result.output)
+        self._update_phase(BusinessPhase.DEVELOPMENT, dev_result.output)
 
         # If development requires approval, wait for it
         if dev_result.requires_approval and dev_result.approval_proposal:
@@ -140,7 +140,7 @@ class PhaseManager:
 
         if design_result.success:
             phase_results["design"] = design_result.output
-        await self._update_phase(BusinessPhase.DESIGN, design_result.output or {})
+        self._update_phase(BusinessPhase.DESIGN, design_result.output or {})
 
         # --- Phase 4: Marketing Preparation ---
         logger.info("Phase 4: Marketing Strategy")
@@ -170,7 +170,7 @@ class PhaseManager:
 
         if marketing_result.success:
             phase_results["marketing"] = marketing_result.output
-        await self._update_phase(BusinessPhase.MARKETING_PREP, marketing_result.output or {})
+        self._update_phase(BusinessPhase.MARKETING_PREP, marketing_result.output or {})
 
         # --- Phase 5: Finance Setup ---
         logger.info("Phase 5: Finance Configuration")
@@ -207,7 +207,7 @@ class PhaseManager:
 
         if finance_result.success:
             phase_results["finance"] = finance_result.output
-        await self._update_phase(BusinessPhase.FINANCE_SETUP, finance_result.output or {})
+        self._update_phase(BusinessPhase.FINANCE_SETUP, finance_result.output or {})
 
         # --- Phase 6: Launch ---
         logger.info("Phase 6: Launching Business")
@@ -237,7 +237,7 @@ class PhaseManager:
         launch_result = await self._execute_launch(phase_results)
 
         if launch_result["success"]:
-            await self._update_phase(
+            self._update_phase(
                 BusinessPhase.OPERATING, {"launched_at": datetime.utcnow().isoformat()}
             )
             await self.notifier.notify_ceo_about_approval(
@@ -365,20 +365,20 @@ class PhaseManager:
                 logger.error(f"Optimization error: {str(e)}")
                 await asyncio.sleep(7200)
 
-    async def _update_phase(self, phase: BusinessPhase, data: Dict[str, Any]):
+    def _update_phase(self, phase: BusinessPhase, data: Dict[str, Any]):
         """Update business phase in database"""
         try:
             with get_db_session() as session:
                 from sqlalchemy import select
 
-                result = await session.execute(
+                result = session.execute(
                     select(Business).where(Business.id == self.business_id)
                 )
                 business = result.scalar_one_or_none()
                 if business:
                     business.current_phase = phase.value
                     business.extra_metadata = {**business.extra_metadata, phase.value: data}
-                    await session.commit()
+                    session.commit()
                     logger.info(f"Phase updated to: {phase.value}")
         except Exception as e:
             logger.error(f"Phase update failed: {str(e)}")
@@ -401,7 +401,7 @@ class PhaseManager:
                     from app.models import ApprovalRequest
                     from sqlalchemy import select
 
-                    result = await session.execute(
+                    result = session.execute(
                         select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
                     )
                     approval = result.scalar_one_or_none()
@@ -462,14 +462,14 @@ class PhaseManager:
             with get_db_session() as session:
                 from sqlalchemy import select
 
-                result = await session.execute(
+                result = session.execute(
                     select(Business).where(Business.id == self.business_id)
                 )
                 business = result.scalar_one_or_none()
                 if business:
                     business.status = "operating"
                     business.launched_at = datetime.utcnow()
-                    await session.commit()
+                    session.commit()
         except Exception as e:
             logger.error(f"Business record update failed: {e}")
 
@@ -514,13 +514,13 @@ class PhaseManager:
 
         return anomalies
 
-    async def _load_business_config(self) -> Dict[str, Any]:
+    def _load_business_config(self) -> Dict[str, Any]:
         """Load business-specific configuration"""
         try:
             with get_db_session() as session:
                 from sqlalchemy import select
 
-                result = await session.execute(
+                result = session.execute(
                     select(Business).where(Business.id == self.business_id)
                 )
                 business = result.scalar_one_or_none()

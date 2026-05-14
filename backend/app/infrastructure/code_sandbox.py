@@ -151,7 +151,8 @@ class CodeSandbox:
             container.start()
 
             try:
-                exit_code = container.wait(timeout=timeout)
+                wait_result = container.wait(timeout=timeout)
+                exit_code = wait_result["StatusCode"] if isinstance(wait_result, dict) else wait_result
                 duration_ms = int((time.time() - start_time) * 1000)
                 timeout_occurred = False
             except Exception:

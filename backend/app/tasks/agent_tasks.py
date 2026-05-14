@@ -6,16 +6,24 @@ from celery import current_app
 
 
 @current_app.task(bind=True, max_retries=3, default_retry_delay=120)
-async def run_agent_task(self, task_id: str, task_type: str, input_data: dict):
+async def run_agent_task(self, task_id: str, task_type: str, input_data: dict, business_id: str = None):
     """
     Execute an agent task asynchronously with retry logic.
     """
     try:
+        from uuid import UUID
+
+        from app.orchestrator.phase_manager import PhaseManager
         from app.orchestrator.task_distributor import TaskDistributor
+
+        # Initialize agents for this business
+        pm = PhaseManager(UUID(business_id)) if business_id else None
+        if pm:
+            await pm.initialize_agents()
 
         distributor = TaskDistributor()
         result = await distributor.distribute_task(
-            agent_pool={},  # Injected by the running worker
+            agent_pool=pm.agents if pm else {},
             task_type=task_type,
             input_data=input_data,
         )

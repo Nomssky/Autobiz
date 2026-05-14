@@ -3,7 +3,7 @@ from uuid import UUID
 
 from app.agents.finance import FinanceAgent
 from app.agents.support import SupportAgent
-from app.infrastructure.notification_service import NotificationService
+from app.approval.notifier import ApprovalNotifier
 from app.workers.celery_app import celery_app
 from celery import Task
 
@@ -44,7 +44,7 @@ async def monitor_business_metrics(self, business_id: str):
                 alerts.append(f"Bug spike: {metrics['bug_count']} active bugs")
 
             if alerts:
-                notifier = NotificationService()
+                notifier = ApprovalNotifier()
                 for alert in alerts:
                     await notifier.send_system_alert(
                         "metric_anomaly", f"Business {business_id}: {alert}", severity="critical"
@@ -102,7 +102,7 @@ async def monitor_support_quality(self, business_id: str):
                 alerts.append(f"Low customer satisfaction: {csat}/5")
 
             if alerts:
-                notifier = NotificationService()
+                notifier = ApprovalNotifier()
                 for alert in alerts:
                     await notifier.send_system_alert(
                         "support_quality", f"Business {business_id}: {alert}", severity="high"

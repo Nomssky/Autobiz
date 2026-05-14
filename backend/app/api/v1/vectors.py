@@ -52,16 +52,10 @@ def search_vectors(
         )
 
     try:
-        import openai
-        from app.config import settings
+        from app.agents.llm_factory import create_embeddings
 
         vs = get_vector_store()
-        client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
-        embedding_response = client.embeddings.create(
-            model="text-embedding-3-small",
-            input=request.query,
-        )
-        query_vector = embedding_response.data[0].embedding
+        query_vector = create_embeddings(request.query)
 
         results = vs.search(
             query_vector=query_vector,

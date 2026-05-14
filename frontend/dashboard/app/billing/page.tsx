@@ -45,7 +45,7 @@ export default function BillingPage() {
 
   async function fetchUsage() {
     try {
-      const data = await api.get('/billing/usage');
+      const data = await api.getBillingUsage();
       setUsage(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load billing data');
@@ -57,7 +57,7 @@ export default function BillingPage() {
   async function handleUpgrade(tier: string) {
     setUpgrading(true);
     try {
-      const data = await api.post(`/billing/upgrade?tier=${tier}`);
+      const data = await api.upgradeBilling(tier);
       if (data.url) {
         window.location.href = data.url;
       } else if (data.type === 'contact_sales') {

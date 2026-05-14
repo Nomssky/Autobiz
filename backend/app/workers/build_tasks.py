@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from app.infrastructure.notification_service import NotificationService
+from app.approval.notifier import ApprovalNotifier
 from app.orchestrator.phase_manager import PhaseManager
 from app.workers.celery_app import celery_app
 from celery import Task
@@ -16,7 +16,7 @@ class BuildTask(Task):
         logger.error(f"Build task {task_id} failed: {str(exc)}")
         business_id = args[0] if args else None
         if business_id:
-            notifier = NotificationService()
+            notifier = ApprovalNotifier()
             try:
                 import asyncio
 

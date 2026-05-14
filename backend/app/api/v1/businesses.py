@@ -11,6 +11,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
+
+def _check_ownership(business: Business, ceo_id: UUID):
+    """Check if the CEO owns the business, handling type differences (UUID vs str)."""
+    if str(business.ceo_id) != str(ceo_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the business owner can perform this action",
+        )
+
 router = APIRouter(prefix="/businesses", tags=["businesses"])
 
 
@@ -115,11 +124,7 @@ def update_business(
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
-    if business.ceo_id != ceo_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the business owner can update",
-        )
+    _check_ownership(business, ceo_id)
 
     update_data = updates.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -148,11 +153,7 @@ def archive_business(
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
-    if business.ceo_id != ceo_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the business owner can archive",
-        )
+    _check_ownership(business, ceo_id)
 
     business.status = "archived"
     business.archived_at = datetime.utcnow()
@@ -214,11 +215,7 @@ def launch_business(
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
-    if business.ceo_id != ceo_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the business owner can launch",
-        )
+    _check_ownership(business, ceo_id)
 
     if business.status != "building":
         raise HTTPException(

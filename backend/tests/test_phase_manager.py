@@ -15,7 +15,7 @@ def phase_manager():
     """Create a PhaseManager instance with mocked database"""
     with patch("app.orchestrator.phase_manager.get_db_session"), patch(
         "app.orchestrator.phase_manager.approval_gateway"
-    ), patch("app.orchestrator.phase_manager.NotificationService"):
+    ), patch("app.orchestrator.phase_manager.ApprovalNotifier"):
         pm = PhaseManager(uuid4())
         pm.agents = {}
         pm.notifier = Mock()

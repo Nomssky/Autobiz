@@ -24,12 +24,23 @@ class Settings(BaseSettings):
     DATABASE_POOL_SIZE: int = 10
     DATABASE_POOL_TIMEOUT: int = 30
 
-    # OpenAI
-    OPENAI_API_KEY: str = "your-openai-api-key"
-    OPENAI_MODEL: str = "gpt-4-turbo"
+    # LLM Provider — supports: openai | anthropic | gemini | ollama | custom
+    LLM_PROVIDER: str = "openai"
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "gpt-4-turbo"
+    LLM_BASE_URL: str = ""
+    LLM_TEMPERATURE: float = 0.7
 
-    # Anthropic
-    ANTHROPIC_API_KEY: str = "your-anthropic-api-key"
+    # Embedding Provider — supports: openai | ollama | custom
+    EMBEDDING_PROVIDER: str = "openai"
+    EMBEDDING_API_KEY: str = ""
+    EMBEDDING_MODEL: str = "text-embedding-3-small"
+    EMBEDDING_BASE_URL: str = ""
+
+    # Legacy — kept for backward compatibility
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4-turbo"
+    ANTHROPIC_API_KEY: str = ""
 
     # Redis
     REDIS_URL: str = "redis://localhost:6379"

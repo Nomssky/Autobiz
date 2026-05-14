@@ -1,7 +1,7 @@
 import logging
 from contextlib import asynccontextmanager
 
-from app.api.dependencies import get_engine
+from app.database import get_engine
 from app.api.v1 import router as v1_router
 from app.auth.middleware import AuthMiddleware
 from app.config import settings

@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -531,3 +533,34 @@ View in Dashboard: https://autobiz.ai/businesses/{business_id}/approvals
         else:
             logger.warning(f"Unknown notification channel: {channel}")
             return False
+
+    async def notify_ceo_about_approval(self, approval_data: Dict) -> bool:
+        """Notify CEO about an approval request (alias for notify_ceo)."""
+        return await self.notify_ceo(approval_data)
+
+    async def send_system_alert(
+        self, alert_type: str, message: str, severity: str = "info"
+    ) -> bool:
+        """Send a system alert via available channels."""
+        logger.info(f"System Alert [{severity}] {alert_type}: {message}")
+        if self.discord.enabled:
+            return await self.discord.send(
+                title=f"[{severity.upper()}] {alert_type}",
+                message=message,
+                color=0xE74C3C if severity == "critical" else 0xF39C12,
+            )
+        return True
+
+    async def notify_agent_about_decision(
+        self, agent_role: str, approval_data: Dict, decision: str
+    ) -> bool:
+        """Notify an agent about an approval decision."""
+        logger.info(
+            f"Agent {agent_role} notified about decision: {decision} on {approval_data.get('title', '')}"
+        )
+        return True
+
+    async def broadcast_to_all_ceos(self, message: str, data: Optional[Dict] = None) -> bool:
+        """Broadcast a message to all CEOs."""
+        logger.info(f"Broadcast: {message}")
+        return True

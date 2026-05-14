@@ -5,68 +5,23 @@ from typing import Any, Dict, List, Optional, Type
 from uuid import UUID
 
 from app.config import settings
+from app.agents.llm_factory import LLMError, create_llm
 from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
-# ---- Real LLM integration with silent mock fallback ----
+# ---- Tool import with graceful fallback ----
 
 try:
-    from langchain_core.messages import HumanMessage, SystemMessage
-    from langchain_core.tools import Tool as _RealTool
-    from langchain_openai import ChatOpenAI as _RealChatOpenAI
-
-    class ChatOpenAI:
-        def __init__(self, model: str, temperature: float, api_key: str):
-            self._llm = _RealChatOpenAI(
-                model=model or settings.OPENAI_MODEL,
-                temperature=temperature or 0.7,
-                api_key=api_key or settings.OPENAI_API_KEY,
-            )
-            self.model = model
-
-        async def ainvoke(self, prompt: str, system_prompt: str = None) -> str:
-            messages = []
-            if system_prompt:
-                messages.append(SystemMessage(content=system_prompt))
-            messages.append(HumanMessage(content=prompt))
-            result = await self._llm.ainvoke(messages)
-            self.last_token_usage = {
-                "input_tokens": (
-                    result.usage_metadata.get("input_tokens", 0)
-                    if hasattr(result, "usage_metadata")
-                    else 0
-                ),
-                "output_tokens": (
-                    result.usage_metadata.get("output_tokens", 0)
-                    if hasattr(result, "usage_metadata")
-                    else 0
-                ),
-            }
-            return result.content
-
-    Tool = _RealTool
-
+    from langchain_core.tools import Tool
 except ImportError:
-    logger.warning("langchain not installed — using mock LLM")
-
-    class ChatOpenAI:
-        def __init__(self, model: str, temperature: float, api_key: str):
-            self.model = model
-            self.temperature = temperature
-            self.api_key = api_key
-
-        async def ainvoke(self, prompt: str, system_prompt: str = None) -> str:
-            return ""
+    logger.warning("langchain-core not installed — using mock Tool class")
 
     class Tool:
         def __init__(self, name: str, func, description: str):
             self.name = name
             self.func = func
             self.description = description
-
-
-logger = logging.getLogger(__name__)
 
 
 class AgentResult(BaseModel):
@@ -97,11 +52,15 @@ class BaseAgent(ABC):
         self.business_id = business_id
         self.role_name = role_name
         self.config = config
-        self.llm = ChatOpenAI(
-            model=settings.OPENAI_MODEL,
-            temperature=config.get("temperature", 0.7),
-            api_key=settings.OPENAI_API_KEY,
-        )
+        try:
+            self.llm = create_llm(
+                model=config.get("model"),
+                temperature=config.get("temperature"),
+                api_key=config.get("api_key"),
+            )
+        except LLMError as e:
+            logger.warning(f"LLM init failed, using mock: {e}")
+            self.llm = _MockLLM()
         self.vector_store = None
         self.memory = {}
 
@@ -155,3 +114,12 @@ class BaseAgent(ABC):
             if query.lower() in key.lower():
                 results.append(value)
         return results[:limit]
+
+
+class _MockLLM:
+    """Silent mock LLM when no real provider is available."""
+
+    last_token_usage: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0}
+
+    async def ainvoke(self, prompt: str, system_prompt: Optional[str] = None) -> str:
+        return ""

@@ -24,9 +24,30 @@ class ApiClient {
   }
 
   // Auth
+  // Generic HTTP methods
+  async get<T = any>(url: string, params?: Record<string, any>) {
+    const { data } = await this.client.get<T>(url, { params });
+    return data;
+  }
+
+  async post<T = any>(url: string, body?: any) {
+    const { data } = await this.client.post<T>(url, body);
+    return data;
+  }
+
+  // Auth
   async login(credentials: { username: string; password: string }) {
     const { data } = await this.client.post('/auth/login', credentials);
     return data;
+  }
+
+  // Billing
+  async getBillingUsage() {
+    return this.get('/billing/usage');
+  }
+
+  async upgradeBilling(tier: string) {
+    return this.post(`/billing/upgrade?tier=${tier}`);
   }
 
   // Businesses

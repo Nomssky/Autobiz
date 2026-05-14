@@ -178,17 +178,42 @@ def retry_failed_tasks(self):
     Runs every 10 minutes via Celery Beat.
     """
     try:
+        from datetime import timedelta
+
         from app.database import SessionLocal
+        from app.models.agent_task import AgentTask
+        from sqlalchemy import select
         from sqlalchemy.orm import Session
 
         db: Session = SessionLocal()
         try:
-            # Find tasks stuck in 'running' for too long (stale tasks)
-            # stale_threshold = datetime.utcnow()  # Would use timedelta in production
-            # This is a simplified version — full implementation
-            # would check for tasks running > 30 minutes
+            # Find tasks stuck in 'running' for too long (stale > 30 minutes)
+            stale_threshold = datetime.utcnow() - timedelta(minutes=30)
+            result = db.execute(
+                select(AgentTask)
+                .where(AgentTask.status == "running")
+                .where(AgentTask.updated_at < stale_threshold)
+            )
+            stale_tasks = result.scalars().all()
 
-            return {"status": "checked", "timestamp": datetime.utcnow().isoformat()}
+            retried = 0
+            for task in stale_tasks:
+                task.status = "pending"
+                task.retry_count = (task.retry_count or 0) + 1
+                logger.info(
+                    f"Retrying stale task {task.id} ({task.task_type}) — "
+                    f"attempt {task.retry_count}"
+                )
+                retried += 1
+
+            db.commit()
+
+            return {
+                "status": "completed",
+                "stale_tasks_found": len(stale_tasks),
+                "retried": retried,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
         finally:
             db.close()
 
