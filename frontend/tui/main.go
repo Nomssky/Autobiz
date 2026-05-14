@@ -25,6 +25,7 @@ type appModel struct {
 	biz        ui.BizModel
 	approvals  ui.ApprovalModel
 	metrics    ui.MetricModel
+	settings   ui.SettingsModel
 	activeTab  int
 
 	width  int
@@ -43,6 +44,7 @@ func initialModel() appModel {
 		biz:       ui.NewBizModel(c),
 		approvals: ui.NewApprovalModel(c),
 		metrics:   ui.NewMetricModel(c),
+		settings:  ui.NewSettingsModel(c),
 	}
 }
 
@@ -75,7 +77,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		if m.screen == screenDashboard {
-			tabKeys := map[string]int{"1": 0, "2": 1, "3": 2, "4": 3}
+			tabKeys := map[string]int{"1": 0, "2": 1, "3": 2, "4": 3, "5": 4}
 			if t, ok := tabKeys[msg.String()]; ok {
 				m.activeTab = t
 				return m, nil
@@ -88,6 +90,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.biz.Init(),
 			m.approvals.Init(),
 			m.metrics.Init(),
+			m.settings.Init(),
 		)
 		return m, tea.Batch(cmds...)
 
@@ -95,7 +98,6 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Route msg to active component
 	var cmd tea.Cmd
 	switch m.screen {
 	case screenAuth:
@@ -108,12 +110,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.approvals, cmd = m.approvals.Update(msg)
 		case 3:
 			m.metrics, cmd = m.metrics.Update(msg)
+		case 4:
+			m.settings, cmd = m.settings.Update(msg)
 		default:
-			// Dashboard tab — check for n key to switch to businesses
 			if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "n" {
-				m.activeTab = 1
-				m.biz, cmd = m.biz.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("n")})
-				// simpler: just switch tab, don't pass key
 				m.activeTab = 1
 			}
 		}
@@ -137,7 +137,7 @@ func (m appModel) View() string {
 }
 
 func (m appModel) dashboardView() string {
-	tabLabels := []string{"Dashboard", "Businesses", "Approvals", "Metrics"}
+	tabLabels := []string{"Dashboard", "Businesses", "Approvals", "Metrics", "Settings"}
 
 	var tabBar string
 	for i, label := range tabLabels {
@@ -167,6 +167,8 @@ func (m appModel) dashboardView() string {
 		content = m.approvals.View()
 	case 3:
 		content = m.metrics.View()
+	case 4:
+		content = m.settings.View()
 	}
 
 	return ui.StyleApp.Render(header + "\n\n" + tabBar + "\n\n" + content)

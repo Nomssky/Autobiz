@@ -185,6 +185,77 @@ type Metric struct {
 	CreatedAt      string  `json:"created_at"`
 }
 
+// ── Settings / Status ─────────────────────────────────────────────────────────
+
+type IntegrationStatus struct {
+	Backend  ServiceStatus  `json:"backend"`
+	Database ServiceStatus  `json:"database"`
+	LLM      LLMStatus      `json:"llm"`
+	Redis    ServiceStatus  `json:"redis"`
+}
+
+type ServiceStatus struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+	URL    string `json:"url,omitempty"`
+}
+
+type LLMStatus struct {
+	Status   string `json:"status"`
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	Note     string `json:"note,omitempty"`
+}
+
+type EnvConfig struct {
+	Env  map[string]string `json:"env"`
+	Path string            `json:"path"`
+	Note string            `json:"note,omitempty"`
+}
+
+type TestLLMResult struct {
+	Success  bool   `json:"success"`
+	Response string `json:"response,omitempty"`
+	Error    string `json:"error,omitempty"`
+	Provider string `json:"provider"`
+}
+
+func (c *Client) GetStatus() (*IntegrationStatus, error) {
+	resp, err := c.do("GET", "/settings/status", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var out IntegrationStatus
+	return &out, json.NewDecoder(resp.Body).Decode(&out)
+}
+
+func (c *Client) GetEnv() (*EnvConfig, error) {
+	resp, err := c.do("GET", "/settings/env", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var out EnvConfig
+	return &out, json.NewDecoder(resp.Body).Decode(&out)
+}
+
+func (c *Client) TestLLM(provider, model, apiKey, baseURL string) (*TestLLMResult, error) {
+	body := map[string]string{
+		"provider": provider,
+		"model":    model,
+		"api_key":  apiKey,
+		"base_url": baseURL,
+	}
+	resp, err := c.do("POST", "/settings/test-llm", body)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	var out TestLLMResult
+	return &out, json.NewDecoder(resp.Body).Decode(&out)
+}
+
 func (c *Client) ListMetrics(businessID string) ([]Metric, error) {
 	path := "/metrics/"
 	if businessID != "" {

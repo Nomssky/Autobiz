@@ -6,6 +6,7 @@ from app.api.v1 import (
     businesses,
     learning,
     metrics,
+    settings,
     vectors,
     webhooks,
 )
@@ -22,3 +23,4 @@ router.include_router(vectors.router)
 router.include_router(learning.router)
 router.include_router(billing.router)
 router.include_router(api_keys.router)
+router.include_router(settings.router)
