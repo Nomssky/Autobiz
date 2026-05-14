@@ -84,8 +84,9 @@ class TaskDistributor:
 
         agent_role = self.TASK_ROUTING.get(task_type)
         if not agent_role:
-            logger.warning(f"No agent routing for task type: {task_type}")
-            agent_role = "researcher"  # Default fallback
+            error_msg = f"No agent routing for task type: {task_type}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
         task = {
             "task_id": task_id,
@@ -125,10 +126,9 @@ class TaskDistributor:
         agent_role = self.TASK_ROUTING.get(task_type)
 
         if not agent_role:
-            logger.warning(
-                f"No agent routing for task type: {task_type}, using researcher as fallback"
-            )
-            agent_role = "researcher"
+            error_msg = f"No agent routing for task type: {task_type}"
+            logger.error(error_msg)
+            return AgentResult(success=False, output=None, error=error_msg)
 
         if agent_role not in agent_pool:
             return AgentResult(
