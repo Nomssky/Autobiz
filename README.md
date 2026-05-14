@@ -31,9 +31,13 @@ curl http://localhost:8000/health
 │   ├── migrations/             # Alembic (initial + perf indexes + multi-tenancy)
 │   ├── tests/                  # 78 tests (unit + integration + load)
 │   └── requirements.txt
-├── frontend-dashboard/         # Next.js 14 dashboard
-├── monitoring/                 # Grafana dashboard + Prometheus alerts
-├── nginx/                      # Reverse proxy
+├── frontend/
+│   ├── dashboard/              # Next.js 14 dashboard
+│   ├── tui/                    # Go TUI client
+│   └── cli/                    # Node.js CLI
+├── infra/
+│   ├── nginx/                  # Reverse proxy
+│   └── monitoring/             # Grafana dashboard + Prometheus alerts
 ├── scripts/                    # healthcheck, seed, setup, load test
 ├── docs/                       # Deployment, API, Agent, Troubleshooting
 └── docker-compose*.yml         # Dev, Production, Monitoring

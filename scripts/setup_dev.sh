@@ -72,11 +72,11 @@ fi
 
 # Frontend dependencies (if Node.js is available)
 if command -v npm &> /dev/null; then
-    if [ -d "frontend-dashboard" ]; then
+    if [ -d "frontend/dashboard" ]; then
         log_info "Installing frontend dependencies..."
-        cd frontend-dashboard
+        cd frontend/dashboard
         npm install 2>/dev/null || log_warn "npm install had issues"
-        cd ..
+        cd ../..
         log_info "Frontend dependencies installed"
     fi
 else
@@ -196,7 +196,7 @@ echo "Quick start:"
 echo "  1. Edit .env with your API keys"
 echo "  2. Start database: docker compose up -d"
 echo "  3. Run backend:    cd backend && uvicorn app.main:app --reload"
-echo "  4. Run frontend:   cd frontend-dashboard && npm run dev"
+echo "  4. Run frontend:   cd frontend/dashboard && npm run dev"
 echo ""
 echo "Pre-commit hooks are installed."
 echo "Run 'pre-commit run --all-files' to check all files."

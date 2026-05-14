@@ -28,13 +28,13 @@ echo ""
 echo "📦 Setting up Prometheus + Grafana..."
 
 # ---- Create monitoring directories ----
-mkdir -p monitoring/prometheus
-mkdir -p monitoring/grafana/dashboards
-mkdir -p monitoring/grafana/provisioning/dashboards
-mkdir -p monitoring/grafana/provisioning/datasources
+mkdir -p infra/monitoring/prometheus
+mkdir -p infra/monitoring/grafana/dashboards
+mkdir -p infra/monitoring/grafana/provisioning/dashboards
+mkdir -p infra/monitoring/grafana/provisioning/datasources
 
 # ---- Prometheus Config ----
-cat > monitoring/prometheus/prometheus.yml << 'PROMETHEUS'
+cat > infra/monitoring/prometheus/prometheus.yml << 'PROMETHEUS'
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
@@ -65,7 +65,7 @@ PROMETHEUS
 echo "✅ Prometheus config created"
 
 # ---- Grafana Dashboard ----
-cat > monitoring/grafana/dashboards/autobiz_dashboard.json << 'GRAFANA'
+cat > infra/monitoring/grafana/dashboards/autobiz_dashboard.json << 'GRAFANA'
 {
   "dashboard": {
     "id": null,
@@ -140,7 +140,7 @@ GRAFANA
 echo "✅ Grafana dashboard created"
 
 # ---- Grafana Datasource Provisioning ----
-cat > monitoring/grafana/provisioning/datasources/prometheus.yml << 'DATASOURCE'
+cat > infra/monitoring/grafana/provisioning/datasources/prometheus.yml << 'DATASOURCE'
 apiVersion: 1
 datasources:
   - name: Prometheus
@@ -151,7 +151,7 @@ datasources:
 DATASOURCE
 
 # ---- Grafana Dashboard Provisioning ----
-cat > monitoring/grafana/provisioning/dashboards/dashboards.yml << 'DASHBOARD'
+cat > infra/monitoring/grafana/provisioning/dashboards/dashboards.yml << 'DASHBOARD'
 apiVersion: 1
 providers:
   - name: 'Default'
@@ -173,7 +173,7 @@ services:
     ports:
       - "${PROMETHEUS_PORT}:9090"
     volumes:
-      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infra/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -187,8 +187,8 @@ services:
       - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASS}
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
-      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infra/monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./infra/monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards
       - grafana_data:/var/lib/grafana
     restart: unless-stopped
 

@@ -96,8 +96,8 @@ docker compose -f docker-compose.prod.yml exec backend python scripts/seed_demo_
 | Service     | Build Context   | Port  |
 |-------------|----------------|-------|
 | Backend     | `./backend`    | 8000  |
-| Frontend    | `./frontend-dashboard` | 3000 |
-| Nginx       | `./nginx`      | 80/443|
+| Frontend    | `./frontend/dashboard` | 3000 |
+| Nginx       | `./infra/nginx` | 80/443|
 | PostgreSQL  | postgres:16    | 5432  |
 | Redis       | redis:7        | 6379  |
 
@@ -105,7 +105,7 @@ docker compose -f docker-compose.prod.yml exec backend python scripts/seed_demo_
 
 Nginx serves the frontend on port 80 and proxies `/api/*` to the backend.
 
-Config: `nginx/nginx.conf`
+Config: `infra/nginx/nginx.conf`
 
 ## Running Workers
 
