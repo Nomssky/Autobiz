@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Type
 from uuid import UUID
 
 from app.config import settings
-from app.agents.llm_factory import LLMError, create_llm
+from app.agents.llm_factory import create_llm
 from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
@@ -52,15 +52,11 @@ class BaseAgent(ABC):
         self.business_id = business_id
         self.role_name = role_name
         self.config = config
-        try:
-            self.llm = create_llm(
-                model=config.get("model"),
-                temperature=config.get("temperature"),
-                api_key=config.get("api_key"),
-            )
-        except LLMError as e:
-            logger.warning(f"LLM init failed, using mock: {e}")
-            self.llm = _MockLLM()
+        self.llm = create_llm(
+            model=config.get("model"),
+            temperature=config.get("temperature"),
+            api_key=config.get("api_key"),
+        )
         self.vector_store = None
         self.memory = {}
 
@@ -114,12 +110,3 @@ class BaseAgent(ABC):
             if query.lower() in key.lower():
                 results.append(value)
         return results[:limit]
-
-
-class _MockLLM:
-    """Silent mock LLM when no real provider is available."""
-
-    last_token_usage: Dict[str, int] = {"input_tokens": 0, "output_tokens": 0}
-
-    async def ainvoke(self, prompt: str, system_prompt: Optional[str] = None) -> str:
-        return ""

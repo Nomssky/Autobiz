@@ -87,11 +87,12 @@ def create_llm(
     provider = (provider or settings.LLM_PROVIDER or "openai").lower()
     base_url = base_url or settings.LLM_BASE_URL or ""
 
-    # If no API key and no local provider, return mock
     api_key = api_key.strip() if api_key else ""
     if not api_key and provider not in ("ollama",):
-        logger.warning(f"No API key configured for provider '{provider}' — using mock LLM")
-        return _create_mock()
+        raise LLMError(
+            f"API key required for provider '{provider}'. "
+            f"Set LLM_API_KEY in .env or switch to LLM_PROVIDER=ollama"
+        )
 
     logger.info(f"Creating LLM: provider={provider}, model={model}")
 
@@ -185,24 +186,6 @@ def _create_custom_openai_compatible(
         return LLMWrapper(llm)
     except ImportError:
         raise LLMError("Custom provider requires: pip install langchain-openai")
-
-
-def _create_mock() -> "LLMWrapper":
-    """Create a mock LLM that returns empty strings (for testing/no-API-key scenarios)."""
-
-    class _MockMessage:
-        """Mock AIMessage that only exposes content and usage_metadata."""
-        def __init__(self):
-            self.content = ""
-            self.usage_metadata = {"input_tokens": 0, "output_tokens": 0}
-
-    class _MockChatModel:
-        """Minimal mock that implements ainvoke without any dependencies."""
-
-        async def ainvoke(self, messages):
-            return _MockMessage()
-
-    return LLMWrapper(_MockChatModel())
 
 
 def create_embeddings(

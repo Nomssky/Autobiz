@@ -110,39 +110,34 @@ Return JSON with pricing_tiers array of {{name, price, currency, billing_cycle, 
 
     async def _setup_stripe_payments(self, params: Dict[str, Any]) -> AgentResult:
         stripe_key = settings.STRIPE_API_KEY or ""
-        if stripe_key and stripe_key != "your-stripe-api-key":
-            try:
-                import stripe
-                stripe.api_key = stripe_key
-                account = stripe.Account.retrieve()
-                return AgentResult(
-                    success=True,
-                    output={
-                        "stripe_mode": "live",
-                        "account_id": account.id,
-                        "account_configured": True,
-                        "payouts_enabled": account.payouts_enabled,
-                    },
-                    requires_approval=False,
-                )
-            except Exception as e:
-                logger.warning(f"Stripe API call failed: {e}")
-        prompt = f"""Design a payment setup plan for business:
-Business model: {params.get('business_model', 'saas')}
-Create a detailed payment processing configuration with:
-- payment_provider: recommended provider
-- pricing_tiers: suggested tiers
-- billing_cycles: monthly, annual
-- setup_steps: implementation checklist
-
-Return ONLY valid JSON with 'payment_provider', 'pricing_tiers', 'billing_cycles', 'setup_steps'."""
+        if not stripe_key or stripe_key == "your-stripe-api-key":
+            return AgentResult(
+                success=False,
+                output=None,
+                error="Stripe API key not configured. Set STRIPE_API_KEY in .env",
+            )
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a payment integration specialist.")
-            output = json.loads(response)
-            output["stripe_mode"] = "configured_via_llm"
-            return AgentResult(success=True, output=output, requires_approval=True)
+            import stripe
+            stripe.api_key = stripe_key
+            account = stripe.Account.retrieve()
+            return AgentResult(
+                success=True,
+                output={
+                    "stripe_mode": "live",
+                    "account_id": account.id,
+                    "account_configured": True,
+                    "payouts_enabled": account.payouts_enabled,
+                },
+                requires_approval=False,
+            )
+        except ImportError:
+            return AgentResult(
+                success=False,
+                output=None,
+                error="Stripe library not installed. Run: pip install stripe",
+            )
         except Exception as e:
-            return AgentResult(success=False, output=None, error=str(e))
+            return AgentResult(success=False, output=None, error=f"Stripe API error: {e}")
 
     async def _track_revenue(self, params: Dict[str, Any]) -> AgentResult:
         prompt = f"""Analyze revenue for period: {params.get('period', 'monthly')}
@@ -178,53 +173,54 @@ Return JSON with: {{cac, ltv, ltv_to_cac_ratio, payback_months, gross_margin, he
 
     async def _create_invoice(self, params: Dict[str, Any]) -> AgentResult:
         stripe_key = settings.STRIPE_API_KEY or ""
-        if stripe_key and stripe_key != "your-stripe-api-key" and params.get("customer_id"):
-            try:
-                import stripe
-                stripe.api_key = stripe_key
-                customer = stripe.Customer.retrieve(params["customer_id"])
-                invoice = stripe.Invoice.create(
-                    customer=customer.id,
-                    collection_method="charge_automatically",
-                    days_until_due=30,
-                )
-                stripe.InvoiceItem.create(
-                    customer=customer.id,
-                    invoice=invoice.id,
-                    amount=int(float(params.get("amount", 0)) * 100),
-                    currency="usd",
-                )
-                invoice.finalize_invoice()
-                return AgentResult(
-                    success=True,
-                    output={
-                        "invoice_id": invoice.id,
-                        "customer_id": customer.id,
-                        "amount": params.get("amount", 0),
-                        "status": invoice.status,
-                        "invoice_url": invoice.hosted_invoice_url,
-                        "stripe_mode": "live",
-                    },
-                    requires_approval=False,
-                )
-            except Exception as e:
-                logger.warning(f"Stripe invoice creation failed: {e}")
-        prompt = f"""Generate an invoice for:
-Customer: {params.get('customer_id', 'unknown')}
-Amount: ${params.get('amount', 0)}
-Description: {params.get('description', 'Services')}
-
-Return JSON with: invoice_id, customer_id, amount, status, line_items[], issue_date, due_date"""
+        if not stripe_key or stripe_key == "your-stripe-api-key":
+            return AgentResult(
+                success=False,
+                output=None,
+                error="Stripe API key not configured. Set STRIPE_API_KEY in .env",
+            )
+        if not params.get("customer_id"):
+            return AgentResult(
+                success=False,
+                output=None,
+                error="customer_id is required to create an invoice",
+            )
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are an accounting system.")
-            output = json.loads(response)
+            import stripe
+            stripe.api_key = stripe_key
+            customer = stripe.Customer.retrieve(params["customer_id"])
+            invoice = stripe.Invoice.create(
+                customer=customer.id,
+                collection_method="charge_automatically",
+                days_until_due=30,
+            )
+            stripe.InvoiceItem.create(
+                customer=customer.id,
+                invoice=invoice.id,
+                amount=int(float(params.get("amount", 0)) * 100),
+                currency="usd",
+            )
+            invoice.finalize_invoice()
             return AgentResult(
                 success=True,
-                output=output,
-                requires_approval=params.get("amount", 0) > 10000,
+                output={
+                    "invoice_id": invoice.id,
+                    "customer_id": customer.id,
+                    "amount": params.get("amount", 0),
+                    "status": invoice.status,
+                    "invoice_url": invoice.hosted_invoice_url,
+                    "stripe_mode": "live",
+                },
+                requires_approval=False,
+            )
+        except ImportError:
+            return AgentResult(
+                success=False,
+                output=None,
+                error="Stripe library not installed. Run: pip install stripe",
             )
         except Exception as e:
-            return AgentResult(success=False, output=None, error=str(e))
+            return AgentResult(success=False, output=None, error=f"Stripe invoice error: {e}")
 
     async def _generate_financial_projection(self, params: Dict[str, Any]) -> AgentResult:
         prompt = f"""Generate 12-month financial projections:
@@ -250,11 +246,11 @@ and summary with {{projected_mrr_12m, break_even_month}}"""
             return AgentResult(success=False, output=None, error=str(e))
 
     async def _get_current_metrics(self) -> AgentResult:
-        try:
-            from app.database import get_db_session
-            from app.models.metric import MetricSnapshot
-            from sqlalchemy import desc, select
+        from app.database import get_db_session
+        from app.models.metric import MetricSnapshot
+        from sqlalchemy import desc, select
 
+        try:
             with get_db_session() as session:
                 result = session.execute(
                     select(MetricSnapshot)
@@ -263,41 +259,32 @@ and summary with {{projected_mrr_12m, break_even_month}}"""
                     .limit(1)
                 )
                 latest = result.scalar_one_or_none()
-                if latest:
+                if not latest:
                     return AgentResult(
-                        success=True,
-                        output={
-                            "daily_revenue": float(latest.daily_revenue or 0),
-                            "weekly_revenue": float(latest.weekly_revenue or 0),
-                            "monthly_revenue": float(latest.monthly_revenue or 0),
-                            "users_count": latest.users_count or 0,
-                            "active_users_count": latest.active_users_count or 0,
-                            "churn_rate": float(latest.churn_rate or 0),
-                            "conversion_rate": float(latest.conversion_rate or 0),
-                            "customer_acquisition_cost": float(latest.customer_acquisition_cost or 0),
-                            "lifetime_value": float(latest.lifetime_value or 0),
-                            "bug_count": latest.bug_count or 0,
-                            "support_tickets_count": latest.support_tickets_count or 0,
-                            "open_support_tickets": latest.open_support_tickets or 0,
-                        },
-                        requires_approval=False,
+                        success=False,
+                        output=None,
+                        error=f"No metrics found for business {self.business_id}. Record metrics first via POST /api/v1/metrics/",
                     )
+                return AgentResult(
+                    success=True,
+                    output={
+                        "daily_revenue": float(latest.daily_revenue or 0),
+                        "weekly_revenue": float(latest.weekly_revenue or 0),
+                        "monthly_revenue": float(latest.monthly_revenue or 0),
+                        "users_count": latest.users_count or 0,
+                        "active_users_count": latest.active_users_count or 0,
+                        "churn_rate": float(latest.churn_rate or 0),
+                        "conversion_rate": float(latest.conversion_rate or 0),
+                        "customer_acquisition_cost": float(latest.customer_acquisition_cost or 0),
+                        "lifetime_value": float(latest.lifetime_value or 0),
+                        "bug_count": latest.bug_count or 0,
+                        "support_tickets_count": latest.support_tickets_count or 0,
+                        "open_support_tickets": latest.open_support_tickets or 0,
+                    },
+                    requires_approval=False,
+                )
         except Exception as e:
-            logger.warning(f"Could not query metrics from DB: {e}")
-
-        prompt = f"""Generate realistic current business metrics for a business.
-Business ID: {self.business_id}
-
-Return ONLY a JSON object with these fields (use reasonable default startup values):
-daily_revenue, weekly_revenue, monthly_revenue, users_count, active_users_count,
-churn_rate, conversion_rate, customer_acquisition_cost, lifetime_value,
-bug_count, support_tickets_count, open_support_tickets"""
-        try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a business analytics system.")
-            output = json.loads(response)
-            return AgentResult(success=True, output=output, requires_approval=False)
-        except Exception as e:
-            return AgentResult(success=False, output=None, error=str(e))
+            return AgentResult(success=False, output=None, error=f"Database query failed: {e}")
 
     async def _analyze_performance(self, params: Dict[str, Any]) -> AgentResult:
         prompt = f"""Analyze financial performance for period: {params.get('period', 'daily')}

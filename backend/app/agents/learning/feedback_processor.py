@@ -79,12 +79,11 @@ class FeedbackProcessor:
         combined = "\n".join(f"- {t[:200]}" for t in texts[:50])
         logger.info(f"Analyzing {len(texts)} feedback items for business {business_id}")
 
-        try:
-            from app.agents.llm_factory import create_llm
-            import asyncio
+        from app.agents.llm_factory import create_llm
+        import asyncio
 
-            llm = create_llm()
-            prompt = f"""Analyze these customer feedback items and extract key themes.
+        llm = create_llm()
+        prompt = f"""Analyze these customer feedback items and extract key themes.
 
 Feedback:
 {combined}
@@ -96,22 +95,19 @@ Return ONLY a JSON array of objects with:
 - sample_comments: array of up to 3 representative quotes
 
 Return max 5 themes."""
-            loop = asyncio.new_event_loop()
-            try:
-                response = loop.run_until_complete(
-                    llm.ainvoke(prompt, system_prompt="You are a feedback analysis AI.")
-                )
-                themes = _json.loads(response)
-                if isinstance(themes, list):
-                    return themes
-            except Exception:
-                pass
-            finally:
-                loop.close()
-        except Exception:
-            pass
-
-        return []
+        loop = asyncio.new_event_loop()
+        try:
+            response = loop.run_until_complete(
+                llm.ainvoke(prompt, system_prompt="You are a feedback analysis AI.")
+            )
+            themes = _json.loads(response)
+            if isinstance(themes, list):
+                return themes
+            raise ValueError(f"LLM returned non-list: {response}")
+        except Exception as e:
+            raise RuntimeError(f"Theme extraction failed: {e}")
+        finally:
+            loop.close()
 
     def generate_improvement_recommendations(self, business_id: UUID, days: int = 30) -> List[Dict]:
         """Generate actionable improvement recommendations from feedback."""

@@ -190,11 +190,11 @@ Return JSON with:
             return AgentResult(success=False, output=None, error=str(e))
 
     async def _process_pending_tickets(self, params: Dict[str, Any]) -> AgentResult:
-        try:
-            from app.database import get_db_session
-            from app.models.agent_task import AgentTask
-            from sqlalchemy import select
+        from app.database import get_db_session
+        from app.models.agent_task import AgentTask
+        from sqlalchemy import select
 
+        try:
             batch_size = params.get("batch_size", 10)
             with get_db_session() as session:
                 result = session.execute(
@@ -241,12 +241,4 @@ Generate a response. Return JSON with:
                     requires_approval=False,
                 )
         except Exception as e:
-            logger.warning(f"Could not process tickets from DB: {e}")
-            prompt = f"""Simulate processing pending support tickets for business {self.business_id}.
-Return JSON with: processed_count (integer), message (string)"""
-            try:
-                response = await self.llm.ainvoke(prompt, system_prompt="Support system.")
-                output = json.loads(response)
-                return AgentResult(success=True, output=output, requires_approval=False)
-            except Exception as e2:
-                return AgentResult(success=False, output=None, error=str(e2))
+            return AgentResult(success=False, output=None, error=f"Ticket processing error: {e}")

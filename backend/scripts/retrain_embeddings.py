@@ -90,14 +90,14 @@ def generate_embeddings(documents: list, dimension: int = 1536) -> list:
                 if (i + 1) % 10 == 0:
                     logger.info(f"  Embedded {i + 1}/{len(texts)}")
             except Exception as e:
-                logger.error(f"Failed to embed doc {doc['id']}: {e}")
-                vector = [0.0] * dimension
-                embeddings.append({**doc, "vector": vector})
+                raise RuntimeError(f"Failed to embed doc {doc['id']}: {e}")
         return embeddings
 
     else:
         import openai as _openai
-        client = _openai.OpenAI(api_key=api_key or None, base_url=base_url or None)
+        if not api_key:
+            raise ValueError("API key required for OpenAI embeddings. Set EMBEDDING_API_KEY or OPENAI_API_KEY in .env")
+        client = _openai.OpenAI(api_key=api_key, base_url=base_url or None)
         embeddings = []
         for i, doc in enumerate(documents):
             try:
@@ -107,9 +107,7 @@ def generate_embeddings(documents: list, dimension: int = 1536) -> list:
                 if (i + 1) % 10 == 0:
                     logger.info(f"  Embedded {i + 1}/{len(texts)}")
             except Exception as e:
-                logger.error(f"Failed to embed doc {doc['id']}: {e}")
-                vector = [0.0] * dimension
-                embeddings.append({**doc, "vector": vector})
+                raise RuntimeError(f"Failed to embed doc {doc['id']}: {e}")
         return embeddings
 
 

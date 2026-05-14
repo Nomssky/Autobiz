@@ -1,5 +1,6 @@
 """Shared test fixtures for the AutoBiz Engine API test suite."""
 
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
@@ -112,6 +113,16 @@ def sample_metric(db_session, sample_business) -> MetricSnapshot:
     db_session.add(metric)
     db_session.flush()
     return metric
+
+
+@pytest.fixture(autouse=True)
+def mock_llm():
+    """Prevent agent tests from requiring API keys or Ollama."""
+    mock = AsyncMock()
+    mock.ainvoke.return_value = "{}"
+    mock.last_token_usage = {"input_tokens": 0, "output_tokens": 0}
+    with patch("app.agents.base_agent.create_llm", return_value=mock):
+        yield
 
 
 @pytest.fixture()
