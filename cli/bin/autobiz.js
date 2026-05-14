@@ -62,19 +62,29 @@ function createSpinner(text) {
 
 function ensurePython() {
   const names = process.platform === 'win32'
-    ? ['python', 'python3', 'py']
-    : ['python3', 'python'];
+    ? ['python', 'python', 'py']
+    : ['python', 'python3'];
 
   for (const name of names) {
     try {
-      const ver = execSync(`${name} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"`, { stdio: 'pipe' }).toString().trim();
-      if (parseFloat(ver) >= 3.9) return name;
-    } catch {}
+      const r = execSync(`${name} -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"`, { stdio: 'pipe', encoding: 'utf-8' });
+      const ver = r.trim();
+      if (ver && parseFloat(ver) >= 3.9) return name;
+    } catch (e) {
+      continue;
+    }
   }
+
+  // Last resort: try `python --version` directly
+  try {
+    execSync('python --version', { stdio: 'pipe' });
+    return 'python';
+  } catch {}
+
   throw new Error(
     'Python 3.9+ is required.\n' +
     '  Download from: https://www.python.org/downloads/\n' +
-    '  Make sure "python3" (or "python" on Windows) is in your PATH.'
+    '  Make sure Python is in your PATH.'
   );
 }
 
@@ -204,12 +214,17 @@ function startBackend() {
     try {
       const python = ensurePython();
       const venv = ensureVenv(python);
-      log(`Starting backend...`, 'dim');
+      log(`Starting backend with SQLite (dev mode)...`, 'dim');
 
       const proc = spawn(venv.python, ['-m', 'uvicorn', 'app.main:app', '--port', '8000'], {
         cwd: BACKEND_DIR,
         stdio: 'pipe',
-        env: { ...process.env, PYTHONPATH: BACKEND_DIR },
+        env: {
+          ...process.env,
+          PYTHONPATH: BACKEND_DIR,
+          DEBUG: 'true',
+          DATABASE_URL: 'sqlite:///./data.db',
+        },
       });
       proc.stdout.on('data', () => {});
       proc.stderr.on('data', () => {});
