@@ -31,6 +31,8 @@ def get_status(_: UUID = Depends(require_ceo)):
             "provider": app_settings.LLM_PROVIDER or "not configured",
             "model": app_settings.LLM_MODEL or app_settings.OPENAI_MODEL or "",
         },
+        "stripe": {"status": "unknown"},
+        "notifications": {"status": "unknown"},
         "redis": {"status": "unknown"},
     }
 
@@ -57,6 +59,26 @@ def get_status(_: UUID = Depends(require_ceo)):
         status["llm"]["status"] = "missing_api_key"
     else:
         status["llm"]["status"] = "not_configured"
+
+    # Check Stripe
+    stripe_key = app_settings.STRIPE_API_KEY or ""
+    if stripe_key and stripe_key != "your-stripe-api-key":
+        status["stripe"] = {"status": "configured", "key_prefix": stripe_key[:8] + "..."}
+    else:
+        status["stripe"] = {"status": "not_configured"}
+
+    # Check Notifications (Discord + Email)
+    discord = bool(app_settings.DISCORD_WEBHOOK_URL)
+    email = bool(app_settings.RESEND_API_KEY or app_settings.SENDGRID_API_KEY)
+    if discord or email:
+        channels = []
+        if discord:
+            channels.append("discord")
+        if email:
+            channels.append("email")
+        status["notifications"] = {"status": "configured", "channels": channels}
+    else:
+        status["notifications"] = {"status": "not_configured"}
 
     # Check Redis
     if app_settings.REDIS_URL:
@@ -114,23 +136,23 @@ def get_env(_: UUID = Depends(require_ceo)):
     else:
         return {"env": {}, "path": "", "note": "No .env file found. Copy .env.example to .env"}
 
-    safe_keys = {
-        "LLM_PROVIDER", "LLM_MODEL", "LLM_BASE_URL", "LLM_TEMPERATURE",
-        "EMBEDDING_PROVIDER", "EMBEDDING_MODEL", "EMBEDDING_BASE_URL",
-        "OLLAMA_BASE_URL", "OLLAMA_MODEL",
-        "OPENAI_MODEL", "ANTHROPIC_API_KEY",
-        "DEBUG", "DATABASE_URL", "SECRET_KEY",
-        "ENABLE_AUTO_APPROVE", "MAX_BUDGET_PER_BUSINESS",
+    grouped_keys = {
+        "LLM Provider": ["LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_BASE_URL", "LLM_TEMPERATURE", "OLLAMA_BASE_URL"],
+        "Embedding": ["EMBEDDING_PROVIDER", "EMBEDDING_MODEL", "EMBEDDING_API_KEY", "EMBEDDING_BASE_URL"],
+        "Stripe": ["STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_STARTER_PRICE_ID", "STRIPE_GROWTH_PRICE_ID", "STRIPE_ENTERPRISE_PRICE_ID"],
+        "Notifications": ["DISCORD_WEBHOOK_URL", "RESEND_API_KEY", "SENDGRID_API_KEY"],
+        "Database": ["DATABASE_URL", "DATABASE_ECHO"],
+        "Auth": ["SECRET_KEY", "ACCESS_TOKEN_EXPIRE_MINUTES"],
+        "Other": ["DEBUG", "ENABLE_AUTO_APPROVE", "MAX_BUDGET_PER_BUSINESS", "REDIS_URL"],
     }
-    secret_keys = {
-        "LLM_API_KEY", "OPENAI_API_KEY", "EMBEDDING_API_KEY",
-        "STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET",
-        "RESEND_API_KEY", "SENDGRID_API_KEY",
-        "SUPABASE_KEY", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
-        "DISCORD_WEBHOOK_URL",
-    }
+    secret_suffixes = ["API_KEY", "SECRET", "WEBHOOK_URL", "PASSWORD", "TOKEN"]
+
+    all_keys = set()
+    for keys in grouped_keys.values():
+        all_keys.update(keys)
 
     config = {}
+    flat = {}
     try:
         with open(env_path) as f:
             for line in f:
@@ -141,14 +163,26 @@ def get_env(_: UUID = Depends(require_ceo)):
                     key, val = line.split("=", 1)
                     key = key.strip()
                     val = val.strip().strip("\"'")
-                    if key in safe_keys:
-                        config[key] = val
-                    elif key in secret_keys:
-                        config[key] = val[:8] + "****" if len(val) > 8 else "****"
+                    flat[key] = val
     except Exception:
         pass
 
-    return {"env": config, "path": env_path}
+    for group, keys in grouped_keys.items():
+        group_config = {}
+        for key in keys:
+            if key in flat:
+                is_secret = any(s in key.upper() for s in secret_suffixes)
+                if is_secret and len(flat[key]) > 8:
+                    group_config[key] = flat[key][:8] + "****"
+                elif is_secret:
+                    group_config[key] = "****"
+                else:
+                    group_config[key] = flat[key]
+            else:
+                group_config[key] = ""
+        config[group] = group_config
+
+    return {"env": config, "path": env_path, "flat": flat}
 
 
 class SaveEnvRequest(BaseModel):
@@ -171,10 +205,13 @@ def save_env(request: SaveEnvRequest, _: UUID = Depends(require_ceo)):
     allowed_keys = {
         "LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_BASE_URL", "LLM_TEMPERATURE",
         "EMBEDDING_PROVIDER", "EMBEDDING_MODEL", "EMBEDDING_API_KEY", "EMBEDDING_BASE_URL",
-        "OLLAMA_BASE_URL", "OLLAMA_MODEL",
+        "OLLAMA_BASE_URL",
         "OPENAI_API_KEY", "OPENAI_MODEL",
-        "SECRET_KEY", "DATABASE_URL", "DEBUG",
-        "DISCORD_WEBHOOK_URL",
+        "SECRET_KEY", "DATABASE_URL", "DEBUG", "REDIS_URL",
+        "STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET",
+        "STRIPE_STARTER_PRICE_ID", "STRIPE_GROWTH_PRICE_ID", "STRIPE_ENTERPRISE_PRICE_ID",
+        "DISCORD_WEBHOOK_URL", "RESEND_API_KEY", "SENDGRID_API_KEY",
+        "ACCESS_TOKEN_EXPIRE_MINUTES", "ENABLE_AUTO_APPROVE", "MAX_BUDGET_PER_BUSINESS",
     }
 
     try:

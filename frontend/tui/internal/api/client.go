@@ -188,10 +188,12 @@ type Metric struct {
 // ── Settings / Status ─────────────────────────────────────────────────────────
 
 type IntegrationStatus struct {
-	Backend  ServiceStatus  `json:"backend"`
-	Database ServiceStatus  `json:"database"`
-	LLM      LLMStatus      `json:"llm"`
-	Redis    ServiceStatus  `json:"redis"`
+	Backend       ServiceStatus      `json:"backend"`
+	Database      ServiceStatus      `json:"database"`
+	LLM           LLMStatus          `json:"llm"`
+	Stripe        ServiceStatus      `json:"stripe"`
+	Notifications ServiceStatus      `json:"notifications"`
+	Redis         ServiceStatus      `json:"redis"`
 }
 
 type ServiceStatus struct {
@@ -208,9 +210,10 @@ type LLMStatus struct {
 }
 
 type EnvConfig struct {
-	Env  map[string]string `json:"env"`
-	Path string            `json:"path"`
-	Note string            `json:"note,omitempty"`
+	Env  map[string]map[string]string `json:"env"`
+	Path string                       `json:"path"`
+	Note string                       `json:"note,omitempty"`
+	Flat map[string]string            `json:"flat"`
 }
 
 type TestLLMResult struct {

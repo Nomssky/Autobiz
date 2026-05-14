@@ -3,22 +3,10 @@ package ui
 import (
 	"autobiz/internal/api"
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-)
-
-type editField int
-
-const (
-	fieldProvider editField = iota
-	fieldModel
-	fieldAPIKey
-	fieldBaseURL
-	fieldEmbedProvider
-	fieldEmbedModel
-	fieldOllamaURL
-	fieldNone
 )
 
 type SettingsModel struct {
@@ -28,8 +16,10 @@ type SettingsModel struct {
 	testRes     *api.TestLLMResult
 	testing     bool
 	saving      bool
-	editing     editField
+	editingKey  string
 	editBuf     string
+	cursorGroup int
+	cursorKey   int
 	errMsg      string
 	successMsg  string
 }
@@ -76,10 +66,10 @@ func (m SettingsModel) testLLMCmd() tea.Cmd {
 func (m SettingsModel) saveCmd() tea.Cmd {
 	m.saving = true
 	return func() tea.Msg {
-		if m.env == nil {
+		if m.env == nil || m.env.Flat == nil {
 			return SavedMsg{Err: "no config loaded"}
 		}
-		err := m.client.SaveEnv(m.env.Env)
+		err := m.client.SaveEnv(m.env.Flat)
 		if err != nil {
 			return SavedMsg{Err: err.Error()}
 		}
@@ -107,7 +97,7 @@ func (m SettingsModel) Update(msg tea.Msg) (SettingsModel, tea.Cmd) {
 		if msg.Err != "" {
 			m.errMsg = msg.Err
 		} else {
-			m.successMsg = "✓ Settings saved"
+			m.successMsg = "✓ Settings saved to .env"
 		}
 	case SettingsErrMsg:
 		m.errMsg = msg.Err
@@ -116,32 +106,31 @@ func (m SettingsModel) Update(msg tea.Msg) (SettingsModel, tea.Cmd) {
 		m.errMsg = ""
 		m.successMsg = ""
 
-		if m.editing != fieldNone {
+		if m.editingKey != "" {
 			return m.handleEdit(msg)
 		}
 
 		switch msg.String() {
-		case "1":
-			m.editing = fieldProvider
-			m.editBuf = m.getVal("LLM_PROVIDER")
-		case "2":
-			m.editing = fieldModel
-			m.editBuf = m.getVal("LLM_MODEL")
-		case "3":
-			m.editing = fieldAPIKey
-			m.editBuf = m.getVal("LLM_API_KEY")
-		case "4":
-			m.editing = fieldBaseURL
-			m.editBuf = m.getVal("LLM_BASE_URL")
-		case "5":
-			m.editing = fieldEmbedProvider
-			m.editBuf = m.getVal("EMBEDDING_PROVIDER")
-		case "6":
-			m.editing = fieldEmbedModel
-			m.editBuf = m.getVal("EMBEDDING_MODEL")
-		case "7":
-			m.editing = fieldOllamaURL
-			m.editBuf = m.getVal("OLLAMA_BASE_URL")
+		case "up", "k":
+			if m.cursorKey > 0 {
+				m.cursorKey--
+			} else if m.cursorGroup > 0 {
+				m.cursorGroup--
+				m.cursorKey = m.groupKeyCount() - 1
+			}
+		case "down", "j":
+			if m.cursorKey < m.groupKeyCount()-1 {
+				m.cursorKey++
+			} else if m.cursorGroup < m.groupCount()-1 {
+				m.cursorGroup++
+				m.cursorKey = 0
+			}
+		case "enter":
+			key := m.currentKey()
+			if key != "" {
+				m.editingKey = key
+				m.editBuf = m.getVal(key)
+			}
 		case "s":
 			return m, m.saveCmd()
 		case "t":
@@ -156,10 +145,13 @@ func (m SettingsModel) Update(msg tea.Msg) (SettingsModel, tea.Cmd) {
 func (m SettingsModel) handleEdit(msg tea.KeyMsg) (SettingsModel, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		m.saveField()
-		m.editing = fieldNone
+		if m.env != nil && m.env.Flat != nil {
+			m.env.Flat[m.editingKey] = m.editBuf
+			m.successMsg = fmt.Sprintf("✎ %s updated (press s to save all)", m.editingKey)
+		}
+		m.editingKey = ""
 	case "esc":
-		m.editing = fieldNone
+		m.editingKey = ""
 		m.editBuf = ""
 	case "backspace":
 		if len(m.editBuf) > 0 {
@@ -173,29 +165,63 @@ func (m SettingsModel) handleEdit(msg tea.KeyMsg) (SettingsModel, tea.Cmd) {
 	return m, nil
 }
 
-func (m SettingsModel) saveField() {
-	if m.env == nil || m.env.Env == nil {
-		return
-	}
-	keys := map[editField]string{
-		fieldProvider:     "LLM_PROVIDER",
-		fieldModel:         "LLM_MODEL",
-		fieldAPIKey:       "LLM_API_KEY",
-		fieldBaseURL:      "LLM_BASE_URL",
-		fieldEmbedProvider: "EMBEDDING_PROVIDER",
-		fieldEmbedModel:    "EMBEDDING_MODEL",
-		fieldOllamaURL:    "OLLAMA_BASE_URL",
-	}
-	key := keys[m.editing]
-	m.env.Env[key] = m.editBuf
-	m.successMsg = fmt.Sprintf("✎ %s updated (press s to save)", key)
-}
-
 func (m SettingsModel) getVal(key string) string {
-	if m.env != nil && m.env.Env != nil {
-		return m.env.Env[key]
+	if m.env != nil && m.env.Flat != nil {
+		return m.env.Flat[key]
 	}
 	return ""
+}
+
+func (m SettingsModel) groupCount() int {
+	if m.env == nil || m.env.Env == nil {
+		return 0
+	}
+	return len(m.env.Env)
+}
+
+func (m SettingsModel) groupKeyCount() int {
+	if m.env == nil || m.env.Env == nil {
+		return 0
+	}
+	groups := m.sortedGroups()
+	if m.cursorGroup >= len(groups) {
+		return 0
+	}
+	return len(m.env.Env[groups[m.cursorGroup]])
+}
+
+func (m SettingsModel) currentKey() string {
+	if m.env == nil || m.env.Env == nil {
+		return ""
+	}
+	groups := m.sortedGroups()
+	if m.cursorGroup >= len(groups) {
+		return ""
+	}
+	group := m.env.Env[groups[m.cursorGroup]]
+	keys := m.sortedKeys(group)
+	if m.cursorKey >= len(keys) {
+		return ""
+	}
+	return keys[m.cursorKey]
+}
+
+func (m SettingsModel) sortedGroups() []string {
+	groups := make([]string, 0, len(m.env.Env))
+	for g := range m.env.Env {
+		groups = append(groups, g)
+	}
+	sort.Strings(groups)
+	return groups
+}
+
+func (m SettingsModel) sortedKeys(data map[string]string) []string {
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func (m SettingsModel) View() string {
@@ -214,7 +240,10 @@ func (m SettingsModel) View() string {
 		}{
 			{"Backend", m.status.Backend.Status, ""},
 			{"Database", m.status.Database.Status, m.status.Database.URL},
-			{"LLM", m.status.LLM.Status, m.status.LLM.Provider + " · " + m.status.LLM.Model},
+			{"AI Provider", m.status.LLM.Status, m.status.LLM.Provider + " · " + m.status.LLM.Model},
+			{"Stripe", m.status.Stripe.Status, ""},
+			{"Notifications", m.status.Notifications.Status, ""},
+			{"Redis", m.status.Redis.Status, ""},
 		}
 		for _, r := range rows {
 			dot := "○"
@@ -226,6 +255,9 @@ func (m SettingsModel) View() string {
 			case "error", "missing_api_key":
 				dot = "●"
 				sty = StyleError
+			case "not_configured":
+				dot = "○"
+				sty = StyleDim
 			}
 			line := fmt.Sprintf("  %s %s", sty.Render(dot), sty.Render(r.name))
 			if r.extra != "" {
@@ -234,64 +266,68 @@ func (m SettingsModel) View() string {
 			sb.WriteString(line + "\n")
 		}
 	} else {
-		sb.WriteString("  ...\n")
+		sb.WriteString("  Loading...\n")
 	}
 	sb.WriteString("\n")
 
-	// ── Editable Fields ──
-	sb.WriteString(styleSection("AI Provider Configuration"))
-	sb.WriteString("\n")
+	// ── Configuration Groups ──
+	if m.env != nil && m.env.Env != nil {
+		groups := m.sortedGroups()
+		for gi, group := range groups {
+			data := m.env.Env[group]
+			isGroupActive := gi == m.cursorGroup
 
-	editableFields := []struct {
-		key    string
-		label  string
-		hotkey string
-		field  editField
-	}{
-		{"LLM_PROVIDER", "Provider", "1", fieldProvider},
-		{"LLM_MODEL", "Model", "2", fieldModel},
-		{"LLM_API_KEY", "API Key", "3", fieldAPIKey},
-		{"LLM_BASE_URL", "Base URL", "4", fieldBaseURL},
-		{"EMBEDDING_PROVIDER", "Embed Provider", "5", fieldEmbedProvider},
-		{"EMBEDDING_MODEL", "Embed Model", "6", fieldEmbedModel},
-		{"OLLAMA_BASE_URL", "Ollama URL", "7", fieldOllamaURL},
+			if isGroupActive {
+				sb.WriteString(StyleHighlight.Render(group))
+			} else {
+				sb.WriteString(StyleInfo.Render(group))
+			}
+			sb.WriteString("\n")
+
+			keys := m.sortedKeys(data)
+			for ki, key := range keys {
+				val := data[key]
+				isActive := isGroupActive && ki == m.cursorKey
+
+				prefix := "  "
+				if isActive {
+					prefix = " ▸"
+				}
+
+				keyLabel := StyleMuted.Render(key + ":")
+				valDisplay := val
+				if val == "" {
+					valDisplay = StyleDim.Render("-")
+				}
+
+				if isActive && m.editingKey == key {
+					// Show editing state
+					sb.WriteString(fmt.Sprintf(" %s %s %s█\n", prefix, keyLabel, StyleHighlight.Render(m.editBuf)))
+					sb.WriteString(fmt.Sprintf("        %s\n", StyleDim.Render("enter confirm  ·  esc cancel")))
+				} else if isActive {
+					sb.WriteString(fmt.Sprintf(" %s %s %s\n", prefix, keyLabel, valDisplay))
+					sb.WriteString(fmt.Sprintf("        %s\n", StyleDim.Render("enter to edit")))
+				} else {
+					sb.WriteString(fmt.Sprintf(" %s  %s %s\n", prefix, keyLabel, valDisplay))
+				}
+			}
+			sb.WriteString("\n")
+		}
+	} else {
+		sb.WriteString("  Loading config...\n\n")
 	}
 
-	for _, f := range editableFields {
-		val := m.getVal(f.key)
-		if val == "" {
-			val = "-"
-		}
-
-		isEditing := m.editing == f.field
-		prefix := "  "
-		if isEditing {
-			prefix = " ✎"
-		}
-
-		label := fmt.Sprintf("%s%s:", StyleInfo.Render(prefix), StyleMuted.Render(" "+f.label))
-		sb.WriteString(fmt.Sprintf("%s  %s\n", label, val))
-
-		if isEditing {
-			sb.WriteString(fmt.Sprintf("     %s█\n", StyleHighlight.Render(m.editBuf)))
-			sb.WriteString(StyleDim.Render("     enter confirm  ·  esc cancel") + "\n")
-		} else {
-			sb.WriteString(fmt.Sprintf("     %s\n", StyleDim.Render(fmt.Sprintf("[%s] edit", f.hotkey))))
-		}
-	}
-
-	sb.WriteString("\n")
-
-	// ── Test Result ──
+	// Test result
 	if m.testing {
-		sb.WriteString(StyleInfo.Render("  Testing LLM connection...") + "\n\n")
+		sb.WriteString(StyleInfo.Render("  Testing LLM...") + "\n")
 	}
 	if m.testRes != nil {
 		if m.testRes.Success {
-			sb.WriteString(StyleSuccess.Render(fmt.Sprintf("  ✓ LLM OK: %s", m.testRes.Response)) + "\n\n")
+			sb.WriteString(StyleSuccess.Render(fmt.Sprintf("  ✓ LLM OK: %s", m.testRes.Response)) + "\n")
 		} else {
-			sb.WriteString(StyleError.Render(fmt.Sprintf("  ✗ LLM failed: %s", m.testRes.Error)) + "\n\n")
+			sb.WriteString(StyleError.Render(fmt.Sprintf("  ✗ LLM: %s", m.testRes.Error)) + "\n")
 		}
+		sb.WriteString("\n")
 	}
 
 	if m.errMsg != "" {
@@ -304,7 +340,7 @@ func (m SettingsModel) View() string {
 		sb.WriteString(StyleInfo.Render("  Saving...") + "\n")
 	}
 
-	sb.WriteString("\n" + StyleDim.Render("1-7 edit fields  ·  s save  ·  t test  ·  R refresh"))
+	sb.WriteString("\n" + StyleDim.Render("↑↓ navigate  ·  enter edit  ·  s save  ·  t test LLM  ·  R refresh"))
 	return sb.String()
 }
 

@@ -162,8 +162,8 @@ def create_checkout_session(
 
     except ImportError:
         raise HTTPException(
-            status_code=501,
-            detail="Stripe library not installed. Run: pip install stripe",
+            status_code=500,
+            detail="Stripe package missing despite being in requirements.txt. Re-run: pip install -r requirements.txt",
         )
 
 
