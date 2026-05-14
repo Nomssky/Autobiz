@@ -1,4 +1,5 @@
-import type { Metadata } from 'next';
+'use client';
+
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
@@ -10,10 +11,6 @@ import { MetricsBarChart, MetricsLineChart, MetricsAreaChart } from '@/component
 interface Props {
   params: { id: string };
 }
-
-export const metadata: Metadata = ({ params }: Props) => ({
-  title: `Business ${params.id} | AutoBiz`,
-});
 
 function ApprovalCard({ title, status, urgency, amount, onClick }: {
   title: string;
