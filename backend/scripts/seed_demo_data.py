@@ -3,6 +3,7 @@
 Run with:
     python scripts/seed_demo_data.py
 """
+
 import os
 import sys
 
@@ -17,16 +18,17 @@ if "postgresql" in settings.DATABASE_URL and not os.environ.get("SEED_USE_POSTGR
     print("To seed SQLite, set: DATABASE_URL=sqlite:///./test.db")
     sys.exit(0)
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.models.base import Base
-from app.models.business import Business
+from datetime import datetime, timezone
+from uuid import uuid4
+
 from app.models.agent_task import AgentTask
 from app.models.approval_request import ApprovalRequest
-from app.models.metric import MetricSnapshot
+from app.models.base import Base
+from app.models.business import Business
 from app.models.deployment import Deployment
-from uuid import uuid4
-from datetime import datetime, timezone
+from app.models.metric import MetricSnapshot
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 
 def seed():
@@ -192,10 +194,10 @@ def seed():
         db.commit()
         print("✅ Demo data seeded successfully!")
         print(f"   - 2 businesses: '{business.name}' (operating), '{business2.name}' (building)")
-        print(f"   - 1 approval request (pending)")
-        print(f"   - 2 agent tasks")
-        print(f"   - 1 metric snapshot")
-        print(f"   - 1 deployment (live)")
+        print("   - 1 approval request (pending)")
+        print("   - 2 agent tasks")
+        print("   - 1 metric snapshot")
+        print("   - 1 deployment (live)")
 
     except Exception as e:
         db.rollback()

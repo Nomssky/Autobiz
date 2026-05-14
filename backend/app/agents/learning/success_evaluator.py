@@ -1,8 +1,9 @@
 """Success evaluator — measures agent decision quality over time."""
-from typing import Dict, List, Optional
-from datetime import datetime, timedelta
-from uuid import UUID
+
 import logging
+from datetime import datetime, timedelta
+from typing import Dict, List
+from uuid import UUID
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,8 @@ class SuccessEvaluator:
 
         Returns a score from 0-100 and improvement suggestions.
         """
-        from sqlalchemy import select, desc
         from app.models.agent_execution import AgentExecution
+        from sqlalchemy import select
 
         cutoff = datetime.utcnow() - timedelta(days=days)
 
@@ -60,12 +61,8 @@ class SuccessEvaluator:
         # Calculate sub-scores
         task_completion_score = success_rate * 100
 
-        avg_input_tokens = (
-            sum(e.input_tokens or 0 for e in executions) / total if total else 0
-        )
-        avg_output_tokens = (
-            sum(e.output_tokens or 0 for e in executions) / total if total else 0
-        )
+        avg_input_tokens = sum(e.input_tokens or 0 for e in executions) / total if total else 0
+        avg_output_tokens = sum(e.output_tokens or 0 for e in executions) / total if total else 0
         total_tokens = avg_input_tokens + avg_output_tokens
         # Ideal: under 2000 tokens for a task
         token_efficiency_score = max(0, min(100, (1 - total_tokens / 5000) * 100))
@@ -109,9 +106,8 @@ class SuccessEvaluator:
 
         trend = "stable"
         if previous_executions:
-            prev_success = (
-                sum(1 for e in previous_executions if e.success)
-                / len(previous_executions)
+            prev_success = sum(1 for e in previous_executions if e.success) / len(
+                previous_executions
             )
             if success_rate > prev_success + 0.05:
                 trend = "improving"
@@ -138,9 +134,7 @@ class SuccessEvaluator:
             "evaluated_at": datetime.utcnow().isoformat(),
         }
 
-    def evaluate_business(
-        self, business_id: UUID, days: int = 30
-    ) -> Dict:
+    def evaluate_business(self, business_id: UUID, days: int = 30) -> Dict:
         """Evaluate all agents for a business."""
         from app.models.agent_execution import AgentExecution
         from sqlalchemy import select
@@ -173,11 +167,11 @@ class SuccessEvaluator:
             "evaluations": evaluations,
             "summary": {
                 "total_agents": len(evaluations),
-                "top_performer": max(
-                    evaluations, key=lambda x: x["score"] or 0
-                )["role_name"]
-                if evaluations
-                else None,
+                "top_performer": (
+                    max(evaluations, key=lambda x: x["score"] or 0)["role_name"]
+                    if evaluations
+                    else None
+                ),
                 "needs_improvement": [
                     e["role_name"]
                     for e in evaluations
@@ -197,52 +191,64 @@ class SuccessEvaluator:
         suggestions = []
 
         if task_completion < 80:
-            suggestions.append({
-                "area": "task_completion",
-                "priority": "high",
-                "suggestion": "Review failed tasks and refine tool usage instructions",
-                "impact": "Improved reliability",
-            })
+            suggestions.append(
+                {
+                    "area": "task_completion",
+                    "priority": "high",
+                    "suggestion": "Review failed tasks and refine tool usage instructions",
+                    "impact": "Improved reliability",
+                }
+            )
 
         if token_efficiency < 60:
-            suggestions.append({
-                "area": "token_efficiency",
-                "priority": "medium",
-                "suggestion": "Optimize prompts to reduce token usage",
-                "impact": "Lower costs and faster execution",
-            })
+            suggestions.append(
+                {
+                    "area": "token_efficiency",
+                    "priority": "medium",
+                    "suggestion": "Optimize prompts to reduce token usage",
+                    "impact": "Lower costs and faster execution",
+                }
+            )
 
         if cost_efficiency < 50:
-            suggestions.append({
-                "area": "cost_efficiency",
-                "priority": "high",
-                "suggestion": "Consider cheaper models or caching strategies",
-                "impact": "Significant cost reduction",
-            })
+            suggestions.append(
+                {
+                    "area": "cost_efficiency",
+                    "priority": "high",
+                    "suggestion": "Consider cheaper models or caching strategies",
+                    "impact": "Significant cost reduction",
+                }
+            )
 
         if speed < 60:
-            suggestions.append({
-                "area": "speed",
-                "priority": "medium",
-                "suggestion": "Parallelize independent operations",
-                "impact": "Faster task completion",
-            })
+            suggestions.append(
+                {
+                    "area": "speed",
+                    "priority": "medium",
+                    "suggestion": "Parallelize independent operations",
+                    "impact": "Faster task completion",
+                }
+            )
 
         if success_rate < 0.9:
-            suggestions.append({
-                "area": "reliability",
-                "priority": "high",
-                "suggestion": "Add retry logic and fallback strategies",
-                "impact": "Higher success rate",
-            })
+            suggestions.append(
+                {
+                    "area": "reliability",
+                    "priority": "high",
+                    "suggestion": "Add retry logic and fallback strategies",
+                    "impact": "Higher success rate",
+                }
+            )
 
         if not suggestions:
-            suggestions.append({
-                "area": "overall",
-                "priority": "info",
-                "suggestion": "Performance is excellent across all metrics",
-                "impact": "Continue current strategy",
-            })
+            suggestions.append(
+                {
+                    "area": "overall",
+                    "priority": "info",
+                    "suggestion": "Performance is excellent across all metrics",
+                    "impact": "Continue current strategy",
+                }
+            )
 
         return suggestions
 

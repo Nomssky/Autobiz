@@ -3,9 +3,8 @@ Database Indexing Migration
 Adds missing indexes to improve query performance for the AutoBiz Engine.
 Run with: alembic revision --autogenerate -m "add_performance_indexes"
 """
+
 from alembic import op
-import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 revision = "perf_indexes_v1"
 down_revision = "c960424bfc03"

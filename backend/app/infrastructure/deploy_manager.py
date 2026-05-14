@@ -2,15 +2,16 @@
 Deployment Manager
 Manages deployment of business infrastructure to cloud providers (Railway, Fly.io, Docker).
 """
+
+import logging
 import os
-import json
+import subprocess
 import time
 import uuid
-import logging
-import subprocess
-from typing import Optional, Dict, Any, List
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ class DeploymentTarget(Enum):
 @dataclass
 class DeploymentConfig:
     """Configuration for a deployment."""
+
     target: DeploymentTarget = DeploymentTarget.DOCKER
     service_name: str = ""
     image: str = ""
@@ -56,6 +58,7 @@ class DeploymentConfig:
 @dataclass
 class DeploymentResult:
     """Result of a deployment operation."""
+
     id: str
     status: DeploymentStatus
     target: DeploymentTarget
@@ -148,8 +151,9 @@ class DeploymentManager:
             logger.error(f"Failed to stop deployment {deployment_id}: {e}")
             return False
 
-    def scale_deployment(self, deployment_id: str, replicas: int,
-                        cpu: float = None, memory: int = None) -> bool:
+    def scale_deployment(
+        self, deployment_id: str, replicas: int, cpu: float = None, memory: int = None
+    ) -> bool:
         """Scale a deployment."""
         result = self._active_deployments.get(deployment_id)
         if not result:
@@ -262,14 +266,12 @@ class DeploymentManager:
                 "projectId": project_id,
                 "serviceName": config.service_name or f"autobiz-{deployment_id[:8]}",
                 "imageUrl": config.image,
-                "envVars": [
-                    {"key": k, "value": v} for k, v in config.env_vars.items()
-                ],
+                "envVars": [{"key": k, "value": v} for k, v in config.env_vars.items()],
                 "region": config.region,
             }
 
             deploy_resp = requests.post(
-                f"https://backboard.railway.app/graphql",
+                "https://backboard.railway.app/graphql",
                 json={
                     "query": """
                         mutation serviceCreate($input: ServiceCreateInput!) {
@@ -306,7 +308,9 @@ class DeploymentManager:
             )
 
         except ImportError:
-            raise ImportError("requests library required for Railway deployment. Install with: pip install requests")
+            raise ImportError(
+                "requests library required for Railway deployment. Install with: pip install requests"
+            )
 
     # ---- Fly.io Deployment ----
 
@@ -319,8 +323,7 @@ class DeploymentManager:
         try:
             # Validate flyctl availability
             result = subprocess.run(
-                ["flyctl", "version"],
-                capture_output=True, text=True, timeout=10
+                ["flyctl", "version"], capture_output=True, text=True, timeout=10
             )
             if result.returncode != 0:
                 raise Exception("flyctl not installed or not accessible")
@@ -349,6 +352,7 @@ primary_region = "{config.region}"
 
             # Write and deploy
             import tempfile
+
             with tempfile.TemporaryDirectory() as tmpdir:
                 flytoml_path = os.path.join(tmpdir, "fly.toml")
                 with open(flytoml_path, "w") as f:
@@ -356,8 +360,10 @@ primary_region = "{config.region}"
 
                 deploy_result = subprocess.run(
                     ["flyctl", "deploy", "--config", flytoml_path, "--remote-only"],
-                    capture_output=True, text=True, timeout=300,
-                    env={**os.environ, "FLY_API_TOKEN": tokens}
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                    env={**os.environ, "FLY_API_TOKEN": tokens},
                 )
 
                 if deploy_result.returncode != 0:
@@ -370,7 +376,7 @@ primary_region = "{config.region}"
                     status=DeploymentStatus.RUNNING,
                     target=DeploymentTarget.FLY_IO,
                     url=url,
-                    logs=deploy_result.stdout.split('\n')[-50:],
+                    logs=deploy_result.stdout.split("\n")[-50:],
                     created_at=datetime.utcnow().isoformat(),
                     updated_at=datetime.utcnow().isoformat(),
                     metadata={
@@ -381,7 +387,9 @@ primary_region = "{config.region}"
                 )
 
         except FileNotFoundError:
-            raise FileNotFoundError("flyctl not found. Install from: https://fly.io/docs/hands-on/install-flyctl/")
+            raise FileNotFoundError(
+                "flyctl not found. Install from: https://fly.io/docs/hands-on/install-flyctl/"
+            )
         except subprocess.TimeoutExpired:
             logger.error("flyctl deploy timed out")
             return DeploymentResult(
@@ -399,6 +407,7 @@ primary_region = "{config.region}"
         """Deploy using local Docker."""
         try:
             import docker
+
             client = docker.from_env()
         except ImportError:
             raise ImportError("docker-py not installed. Install with: pip install docker")
@@ -413,17 +422,15 @@ primary_region = "{config.region}"
                 logger.info(f"Pulling Docker image: {config.image}")
                 client.images.pull(config.image)
 
-            # Build host config
-            host_config = docker.types.HostConfig(
-                port_bindings={
-                    config.port: ('127.0.0.1', config.port)
-                },
-                mem_limit=f"{config.memory}m",
-                nano_cpus=int(config.cpu * 1e9),
-                restart_policy=docker.types.RestartPolicy(
-                    condition="always" if config.auto_restart else "no"
-                ),
-            )
+            # host_config built below; currently unused but kept for reference
+            # _host_config = docker.types.HostConfig(
+            #     port_bindings={config.port: ("127.0.0.1", config.port)},
+            #     mem_limit=f"{config.memory}m",
+            #     nano_cpus=int(config.cpu * 1e9),
+            #     restart_policy=docker.types.RestartPolicy(
+            #         condition="always" if config.auto_restart else "no"
+            #     ),
+            # )
 
             # Create and start container
             policy = "always" if config.auto_restart else None
@@ -431,7 +438,7 @@ primary_region = "{config.region}"
                 config.image,
                 name=container_name,
                 detach=True,
-                ports={config.port: ('127.0.0.1', config.port)},
+                ports={config.port: ("127.0.0.1", config.port)},
                 environment=config.env_vars or {},
                 mem_limit=f"{config.memory}m",
                 nano_cpus=int(config.cpu * 1e9),
@@ -459,6 +466,7 @@ primary_region = "{config.region}"
     def _deploy_local(self, deployment_id: str, config: DeploymentConfig) -> DeploymentResult:
         """Run service locally using subprocess."""
         import subprocess
+
         port = config.port or 8000
         cmd = ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", str(port)]
 
@@ -485,6 +493,7 @@ primary_region = "{config.region}"
     def _stop_docker_deployment(self, deployment_id: str):
         try:
             import docker
+
             client = docker.from_env()
             result = self._active_deployments.get(deployment_id)
             if result and result.metadata.get("container_name"):
@@ -500,7 +509,8 @@ primary_region = "{config.region}"
             if app_name:
                 subprocess.run(
                     ["flyctl", "apps", "destroy", app_name, "--yes"],
-                    capture_output=True, timeout=30,
+                    capture_output=True,
+                    timeout=30,
                 )
         except Exception:
             logger.warning(f"Could not stop Fly.io deployment {result.id}")
@@ -509,8 +519,9 @@ primary_region = "{config.region}"
         # Railway project cleanup via API would go here
         logger.info(f"Stopping Railway deployment: {result.id}")
 
-    def _scale_flyio(self, result: DeploymentResult, replicas: int,
-                     cpu: float = None, memory: int = None):
+    def _scale_flyio(
+        self, result: DeploymentResult, replicas: int, cpu: float = None, memory: int = None
+    ):
         app_name = result.metadata.get("app_name")
         if not app_name:
             return
@@ -521,30 +532,38 @@ primary_region = "{config.region}"
         if memory:
             cmd.extend(["--vm-memory", f"{memory}mb"])
 
-        subprocess.run(cmd, capture_output=True, timeout=120,
-                      env={**os.environ, "FLY_API_TOKEN": self._api_tokens.get("flyio", "")})
+        subprocess.run(
+            cmd,
+            capture_output=True,
+            timeout=120,
+            env={**os.environ, "FLY_API_TOKEN": self._api_tokens.get("flyio", "")},
+        )
 
     def _scale_railway(self, result: DeploymentResult, replicas: int):
         tokens = self._api_tokens.get("railway")
         if tokens:
             try:
                 import requests
+
                 headers = {"Authorization": f"Bearer {tokens}"}
                 # Railway scaling API call
                 requests.post(
-                    f"https://backboard.railway.app/graphql",
+                    "https://backboard.railway.app/graphql",
                     json={
                         "query": """
                             mutation ($input: ServiceUpdateInput!) {
                                 serviceUpdate(input: $input) { id }
                             }
                         """,
-                        "variables": {"input": {
-                            "id": result.metadata.get("service_id"),
-                            "numReplicas": replicas,
-                        }}
+                        "variables": {
+                            "input": {
+                                "id": result.metadata.get("service_id"),
+                                "numReplicas": replicas,
+                            }
+                        },
                     },
-                    headers=headers, timeout=30,
+                    headers=headers,
+                    timeout=30,
                 )
             except Exception as e:
                 logger.error(f"Railway scaling failed: {e}")
@@ -552,12 +571,13 @@ primary_region = "{config.region}"
     def _get_docker_logs(self, deployment_id: str, lines: int) -> List[str]:
         try:
             import docker
+
             client = docker.from_env()
             result = self._active_deployments.get(deployment_id)
             if result:
                 container = client.containers.get(result.metadata["container_name"])
-                logs = container.logs(tail=lines).decode('utf-8', errors='replace')
-                return logs.split('\n')
+                logs = container.logs(tail=lines).decode("utf-8", errors="replace")
+                return logs.split("\n")
         except Exception:
             pass
         return []
@@ -568,10 +588,12 @@ primary_region = "{config.region}"
             if app_name:
                 proc = subprocess.run(
                     ["flyctl", "logs", "-a", app_name, "--lines", str(lines)],
-                    capture_output=True, text=True, timeout=30
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
                 )
                 if proc.returncode == 0:
-                    return proc.stdout.split('\n')[-lines:]
+                    return proc.stdout.split("\n")[-lines:]
         except Exception:
             pass
         return []

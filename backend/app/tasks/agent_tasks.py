@@ -1,6 +1,7 @@
 """
 Agent-related background tasks (Celery workers).
 """
+
 from celery import current_app
 
 
@@ -32,7 +33,7 @@ def run_batch_agent_tasks(self, tasks: list[dict]):
     results = []
     for task in tasks:
         try:
-            result = run_agent_task.apply(
+            run_agent_task.apply(
                 args=(task["task_id"], task["task_type"], task["input_data"]),
                 priority=task.get("priority", 3),
             )

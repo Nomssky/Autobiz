@@ -2,8 +2,10 @@
 Batch processing tasks for the AutoBiz Engine.
 Handles high-volume operations that benefit from batching.
 """
-from celery import current_app
+
 from datetime import datetime
+
+from celery import current_app
 
 
 @current_app.task(
@@ -67,28 +69,36 @@ def batched_metrics_aggregation(self):
     """
     try:
         from app.database import SessionLocal
-        from sqlalchemy import func, select
         from app.models.metric import MetricSnapshot
+        from sqlalchemy import func
         from sqlalchemy.orm import Session
 
         db: Session = SessionLocal()
         try:
             # Aggregate metrics by role
-            role_stats = db.query(
-                MetricSnapshot.recorded_by_role,
-                func.count(MetricSnapshot.id).label("count"),
-                func.avg(MetricSnapshot.daily_revenue).label("avg_revenue"),
-                func.avg(MetricSnapshot.users_count).label("avg_users"),
-                func.avg(MetricSnapshot.churn_rate).label("avg_churn"),
-            ).group_by(MetricSnapshot.recorded_by_role).all()
+            role_stats = (
+                db.query(
+                    MetricSnapshot.recorded_by_role,
+                    func.count(MetricSnapshot.id).label("count"),
+                    func.avg(MetricSnapshot.daily_revenue).label("avg_revenue"),
+                    func.avg(MetricSnapshot.users_count).label("avg_users"),
+                    func.avg(MetricSnapshot.churn_rate).label("avg_churn"),
+                )
+                .group_by(MetricSnapshot.recorded_by_role)
+                .all()
+            )
 
             # Aggregate metrics by business
-            business_stats = db.query(
-                MetricSnapshot.business_id,
-                func.count(MetricSnapshot.id).label("snapshot_count"),
-                func.max(MetricSnapshot.created_at).label("latest"),
-                func.avg(MetricSnapshot.daily_revenue).label("avg_revenue"),
-            ).group_by(MetricSnapshot.business_id).all()
+            business_stats = (
+                db.query(
+                    MetricSnapshot.business_id,
+                    func.count(MetricSnapshot.id).label("snapshot_count"),
+                    func.max(MetricSnapshot.created_at).label("latest"),
+                    func.avg(MetricSnapshot.daily_revenue).label("avg_revenue"),
+                )
+                .group_by(MetricSnapshot.business_id)
+                .all()
+            )
 
             result = {
                 "aggregation_timestamp": datetime.utcnow().isoformat(),
@@ -108,6 +118,7 @@ def batched_metrics_aggregation(self):
             # Store in Redis cache for quick dashboard access
             try:
                 from app.infrastructure.cache import get_redis
+
                 redis = get_redis()
                 if redis:
                     redis.setex(
@@ -137,6 +148,7 @@ def cache_cleanup(self):
     """
     try:
         from app.infrastructure.cache import get_redis
+
         redis = get_redis()
         if not redis:
             return {"status": "skipped", "reason": "no redis"}
@@ -167,14 +179,12 @@ def retry_failed_tasks(self):
     """
     try:
         from app.database import SessionLocal
-        from app.models.agent_task import AgentTask
-        from sqlalchemy import update, and_
         from sqlalchemy.orm import Session
 
         db: Session = SessionLocal()
         try:
             # Find tasks stuck in 'running' for too long (stale tasks)
-            stale_threshold = datetime.utcnow()  # Would use timedelta in production
+            # stale_threshold = datetime.utcnow()  # Would use timedelta in production
             # This is a simplified version — full implementation
             # would check for tasks running > 30 minutes
 

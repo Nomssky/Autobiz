@@ -4,28 +4,25 @@ Integration tests for AutoBiz Engine — Complete Approval Flow.
 Test flow: Create Business → Agent creates approval request → CEO approve/reject
 → Notification sent → Next task proceeds → Verify end-to-end
 """
-import pytest
-import sys
+
 import os
-from unittest.mock import patch, MagicMock, AsyncMock
-from uuid import uuid4
+import sys
 from datetime import datetime, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
+
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from starlette.testclient import TestClient
-from app.main import app
 from app.api.dependencies import get_db_session
 from app.auth.jwt_handler import create_access_token
+from app.main import app
 from app.models.base import Base
-from app.models.business import Business
-from app.models.agent_task import AgentTask
-from app.models.approval_request import ApprovalRequest
-
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
+from starlette.testclient import TestClient
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
 
@@ -42,6 +39,7 @@ def _fk_pragma_on_connect(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
+
 
 event.listen(engine, "connect", _fk_pragma_on_connect)
 
@@ -65,6 +63,7 @@ def override_get_db(setup_db):
             raise
         finally:
             db.close()
+
     app.dependency_overrides[get_db_session] = _override
     yield
     app.dependency_overrides.clear()
@@ -362,9 +361,7 @@ class TestApprovalViaGateway:
     async def test_gateway_create_and_notify(self, ceo_id):
         from app.approval.gateway import ApprovalGateway
 
-        with patch.object(
-            ApprovalGateway, "get_db"
-        ) as mock_get_db, patch.object(
+        with patch.object(ApprovalGateway, "get_db") as mock_get_db, patch.object(
             ApprovalGateway,
             "_notify_agent",
             new_callable=AsyncMock,
@@ -383,9 +380,7 @@ class TestApprovalViaGateway:
             mock_uuid.__aenter__ = AsyncMock(return_value=approval_id)
 
             gateway = ApprovalGateway()
-            with patch.object(
-                gateway.notifier, "notify_ceo", new_callable=AsyncMock
-            ):
+            with patch.object(gateway.notifier, "notify_ceo", new_callable=AsyncMock):
                 result = await gateway.create_approval_request(
                     business_id=uuid4(),
                     task_id=uuid4(),
@@ -398,9 +393,7 @@ class TestApprovalViaGateway:
     async def test_gateway_process_decision(self, ceo_id):
         from app.approval.gateway import ApprovalGateway
 
-        with patch.object(
-            ApprovalGateway, "get_db"
-        ) as mock_get_db, patch.object(
+        with patch.object(ApprovalGateway, "get_db") as mock_get_db, patch.object(
             ApprovalGateway,
             "_notify_agent",
             new_callable=AsyncMock,
@@ -421,9 +414,7 @@ class TestApprovalViaGateway:
             )
 
             gateway = ApprovalGateway()
-            with patch.object(
-                gateway.notifier, "notify_ceo", new_callable=AsyncMock
-            ):
+            with patch.object(gateway.notifier, "notify_ceo", new_callable=AsyncMock):
                 result = await gateway.process_decision(
                     approval_id=uuid4(),
                     ceo_id=ceo_id,
@@ -436,9 +427,7 @@ class TestApprovalViaGateway:
     async def test_gateway_rejects(self, ceo_id):
         from app.approval.gateway import ApprovalGateway
 
-        with patch.object(
-            ApprovalGateway, "get_db"
-        ) as mock_get_db, patch.object(
+        with patch.object(ApprovalGateway, "get_db") as mock_get_db, patch.object(
             ApprovalGateway,
             "_notify_agent",
             new_callable=AsyncMock,
@@ -459,9 +448,7 @@ class TestApprovalViaGateway:
             )
 
             gateway = ApprovalGateway()
-            with patch.object(
-                gateway.notifier, "notify_ceo", new_callable=AsyncMock
-            ):
+            with patch.object(gateway.notifier, "notify_ceo", new_callable=AsyncMock):
                 result = await gateway.process_decision(
                     approval_id=uuid4(),
                     ceo_id=ceo_id,

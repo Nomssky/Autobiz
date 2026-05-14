@@ -2,9 +2,10 @@
 Request/Response Logging Middleware
 Logs all incoming requests and outgoing responses for monitoring and debugging.
 """
+
 import json
-import time
 import logging
+import time
 from typing import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -70,9 +71,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             body or "N/A",
         )
 
-    def _log_response(
-        self, request: Request, response: Response, elapsed_ms: float
-    ) -> None:
+    def _log_response(self, request: Request, response: Response, elapsed_ms: float) -> None:
         """Log outgoing response details."""
         content_length = response.headers.get("content-length", "N/A")
 

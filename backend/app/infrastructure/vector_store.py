@@ -1,7 +1,7 @@
 """Vector store interface — supports Pinecone and Qdrant backends."""
+
 import os
 from typing import Dict, List, Optional
-from uuid import UUID
 
 
 class VectorStore:
@@ -25,6 +25,7 @@ class VectorStore:
     def _connect_pinecone(self):
         """Connect to Pinecone."""
         import pinecone
+
         api_key = os.environ.get("PINECONE_API_KEY", self.config.get("api_key", ""))
         if not api_key:
             raise ValueError("PINECONE_API_KEY not configured")
@@ -113,7 +114,6 @@ class VectorStore:
                 for m in result.get("matches", [])
             ]
         elif self.backend == "qdrant":
-            from qdrant_client.http import models as rest
 
             search_result = self._client.search(
                 collection_name=self._collection,
@@ -163,7 +163,6 @@ class VectorStore:
                 v = vectors[vector_id]
                 return {"id": v.id, "values": v.values, "metadata": v.metadata}
         elif self.backend == "qdrant":
-            from qdrant_client.http import models as rest
 
             results = self._client.retrieve(
                 collection_name=self._collection,
@@ -192,5 +191,7 @@ class VectorStore:
     def close(self):
         """Close connections."""
         if self.backend == "pinecone":
+            import pinecone
+
             pinecone.deinit()
         self._client = None

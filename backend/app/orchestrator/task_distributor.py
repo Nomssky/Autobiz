@@ -1,11 +1,9 @@
-from typing import Dict, Any, List, Optional
-from uuid import UUID
 import asyncio
 import logging
 from datetime import datetime
+from typing import Any, Dict, List
 
-from app.agents.base_agent import BaseAgent, AgentResult
-from app.orchestrator.crew_runner import CrewRunner
+from app.agents.base_agent import AgentResult, BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -20,20 +18,17 @@ class TaskDistributor:
         "market_analysis": "researcher",
         "competitor_research": "researcher",
         "trend_analysis": "researcher",
-
         # Development tasks
         "generate_application": "developer",
         "fix_bug": "developer",
         "implement_feature": "developer",
         "deploy": "developer",
-
         # Design tasks
         "generate_image": "designer",
         "create_logo": "designer",
         "design_banner": "designer",
         "edit_image": "designer",
         "create_brand_identity": "designer",
-
         # Marketing tasks
         "create_social_post": "marketer",
         "write_blog_post": "marketer",
@@ -44,7 +39,6 @@ class TaskDistributor:
         "activate_launch_campaigns": "marketer",
         "execute_scheduled_content": "marketer",
         "create_retention_campaign": "marketer",
-
         # Finance tasks
         "setup_pricing_and_payments": "finance",
         "setup_pricing": "finance",
@@ -55,7 +49,6 @@ class TaskDistributor:
         "generate_financial_projection": "finance",
         "get_current_metrics": "finance",
         "optimize_pricing": "finance",
-
         # Support tasks
         "process_ticket": "support",
         "auto_respond": "support",
@@ -67,13 +60,7 @@ class TaskDistributor:
     }
 
     # Priority queue configuration
-    PRIORITY_LEVELS = {
-        "critical": 5,
-        "high": 4,
-        "normal": 3,
-        "low": 2,
-        "background": 1
-    }
+    PRIORITY_LEVELS = {"critical": 5, "high": 4, "normal": 3, "low": 2, "background": 1}
 
     def __init__(self):
         self.task_queue: List[Dict[str, Any]] = []
@@ -88,10 +75,11 @@ class TaskDistributor:
         input_data: Dict[str, Any],
         priority: str = "normal",
         depends_on: List[str] = None,
-        context: Dict = None
+        context: Dict = None,
     ) -> str:
         """Add a task to the distribution queue"""
         import uuid
+
         task_id = str(uuid.uuid4())
 
         agent_role = self.TASK_ROUTING.get(task_type)
@@ -109,7 +97,7 @@ class TaskDistributor:
             "depends_on": depends_on or [],
             "context": context or {},
             "created_at": datetime.utcnow().isoformat(),
-            "status": "pending"
+            "status": "pending",
         }
 
         self.task_queue.append(task)
@@ -131,20 +119,20 @@ class TaskDistributor:
         task_type: str,
         input_data: Dict[str, Any],
         priority: str = "normal",
-        context: Dict = None
+        context: Dict = None,
     ) -> AgentResult:
         """Immediately distribute a task to the appropriate agent"""
         agent_role = self.TASK_ROUTING.get(task_type)
 
         if not agent_role:
-            logger.warning(f"No agent routing for task type: {task_type}, using researcher as fallback")
+            logger.warning(
+                f"No agent routing for task type: {task_type}, using researcher as fallback"
+            )
             agent_role = "researcher"
 
         if agent_role not in agent_pool:
             return AgentResult(
-                success=False,
-                output=None,
-                error=f"Agent {agent_role} not available in pool"
+                success=False, output=None, error=f"Agent {agent_role} not available in pool"
             )
 
         agent = agent_pool[agent_role]
@@ -161,8 +149,8 @@ class TaskDistributor:
                     "result": {
                         "success": result.success,
                         "output": result.output,
-                        "execution_time_ms": result.execution_time_ms
-                    }
+                        "execution_time_ms": result.execution_time_ms,
+                    },
                 }
                 # Check for dependent tasks
                 await self._resolve_dependencies(task_id, agent_pool)
@@ -170,7 +158,7 @@ class TaskDistributor:
                 self.failed_tasks[task_id] = {
                     "task_type": task_type,
                     "agent_role": agent_role,
-                    "error": result.error
+                    "error": result.error,
                 }
 
             return result
@@ -178,15 +166,11 @@ class TaskDistributor:
         except Exception as e:
             logger.error(f"Task distribution failed for {task_type}: {str(e)}")
             return AgentResult(
-                success=False,
-                output=None,
-                error=f"Task distribution failed: {str(e)}"
+                success=False, output=None, error=f"Task distribution failed: {str(e)}"
             )
 
     async def process_queue(
-        self,
-        agent_pool: Dict[str, BaseAgent],
-        max_concurrent: int = 3
+        self, agent_pool: Dict[str, BaseAgent], max_concurrent: int = 3
     ) -> Dict[str, Any]:
         """Process all queued tasks"""
         self._processing = True
@@ -199,10 +183,7 @@ class TaskDistributor:
                 task = self.task_queue.pop(0)
 
                 # Check if all dependencies are met
-                deps_met = all(
-                    dep in self.completed_tasks
-                    for dep in task.get("depends_on", [])
-                )
+                deps_met = all(dep in self.completed_tasks for dep in task.get("depends_on", []))
                 if not deps_met:
                     # Put back and skip for now
                     self.task_queue.append(task)
@@ -229,14 +210,10 @@ class TaskDistributor:
         return {
             "results": results,
             "completed": len([r for r in results.values() if r.get("success")]),
-            "failed": len([r for r in results.values() if not r.get("success")])
+            "failed": len([r for r in results.values() if not r.get("success")]),
         }
 
-    async def _execute_task(
-        self,
-        agent_pool: Dict[str, BaseAgent],
-        task: Dict[str, Any]
-    ) -> tuple:
+    async def _execute_task(self, agent_pool: Dict[str, BaseAgent], task: Dict[str, Any]) -> tuple:
         """Execute a single task"""
         task_id = task["task_id"]
         agent_role = task["agent_role"]
@@ -244,15 +221,9 @@ class TaskDistributor:
         try:
             agent = agent_pool.get(agent_role)
             if not agent:
-                return task_id, {
-                    "success": False,
-                    "error": f"Agent {agent_role} not found"
-                }
+                return task_id, {"success": False, "error": f"Agent {agent_role} not found"}
 
-            result = await agent.run_with_tracking(
-                task["task_type"],
-                task["input_data"]
-            )
+            result = await agent.run_with_tracking(task["task_type"], task["input_data"])
 
             if result.success:
                 self.completed_tasks[task_id] = result.output
@@ -272,15 +243,12 @@ class TaskDistributor:
                 "output": result.output,
                 "error": result.error,
                 "requires_approval": result.requires_approval,
-                "execution_time_ms": result.execution_time_ms
+                "execution_time_ms": result.execution_time_ms,
             }
 
         except Exception as e:
             logger.error(f"Task {task_id} failed: {str(e)}")
-            return task_id, {
-                "success": False,
-                "error": str(e)
-            }
+            return task_id, {"success": False, "error": str(e)}
 
     async def _resolve_dependencies(self, completed_task_id: str, agent_pool: Dict[str, BaseAgent]):
         """Check and queue tasks whose dependencies are now met"""
@@ -290,8 +258,7 @@ class TaskDistributor:
             for task in self.task_queue:
                 if task["task_id"] == dep_task_id:
                     deps_met = all(
-                        dep in self.completed_tasks
-                        for dep in task.get("depends_on", [])
+                        dep in self.completed_tasks for dep in task.get("depends_on", [])
                     )
                     if deps_met:
                         # Move to front of queue (high priority for unblocked tasks)
@@ -308,5 +275,5 @@ class TaskDistributor:
             "completed": len(self.completed_tasks),
             "failed": len(self.failed_tasks),
             "pending_task_ids": [t["task_id"] for t in self.task_queue],
-            "is_processing": self._processing
+            "is_processing": self._processing,
         }

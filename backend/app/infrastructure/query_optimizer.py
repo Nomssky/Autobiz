@@ -2,17 +2,19 @@
 Query Performance Profiler & N+1 Detector
 Utilities to identify and fix common database performance issues.
 """
-import time
+
 import logging
+import time
 from functools import wraps
-from typing import Any, Callable, TypeVar, ParamSpec
+from typing import Any, Callable, ParamSpec, TypeVar
+
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session
 
 logger = logging.getLogger("db.performance")
 
 # ---- N+1 Query Detection ----
+
 
 class N1Detector:
     """
@@ -41,14 +43,14 @@ class N1Detector:
 
     def __enter__(self):
         # Patch SQLAlchemy to track queries
-        from sqlalchemy import engine
-        self._original_execute = engine.Engine.execute
-        engine.Engine.execute = self._tracked_execute  # type: ignore
+
+        self._original_execute = Engine.execute
+        Engine.execute = self._tracked_execute  # type: ignore
         return self
 
     def __exit__(self, *args):
         if self._original_execute:
-            engine.Engine.execute = self._original_execute
+            Engine.execute = self._original_execute
 
     def _tracked_execute(self, *args, **kwargs):
         start = time.perf_counter()
@@ -57,10 +59,12 @@ class N1Detector:
 
         # Extract SQL statement
         statement = args[1] if len(args) > 1 else str(kwargs.get("statement", ""))
-        self.queries.append({
-            "statement": str(statement)[:200],
-            "elapsed_ms": elapsed,
-        })
+        self.queries.append(
+            {
+                "statement": str(statement)[:200],
+                "elapsed_ms": elapsed,
+            }
+        )
         return result
 
     def report(self) -> list[dict]:
@@ -110,6 +114,7 @@ def log_query_time(func: Callable[P, R]) -> Callable[P, R]:
             )
             return db.execute(query).scalar_one()
     """
+
     @wraps(func)
     def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
         start = time.perf_counter()
@@ -129,6 +134,7 @@ def log_query_time(func: Callable[P, R]) -> Callable[P, R]:
                 elapsed_ms,
             )
         return result
+
     return wrapper
 
 
@@ -146,6 +152,7 @@ def install_query_monitor(engine: Engine):
         from app.database import engine
         install_query_monitor(engine)
     """
+
     @event.listens_for(engine, "before_cursor_execute")
     def before_cursor_execute(conn, cursor, statement, parameters, context, executemany):
         conn.info.setdefault("query_start_time", []).append(time.perf_counter())
@@ -156,7 +163,9 @@ def install_query_monitor(engine: Engine):
         if start_times:
             elapsed = (time.perf_counter() - start_times.pop()) * 1000
             # Track by statement pattern (simplified — strip parameters)
-            stmt_key = statement.split("WHERE")[0].strip()[:80] if "WHERE" in statement else statement[:80]
+            stmt_key = (
+                statement.split("WHERE")[0].strip()[:80] if "WHERE" in statement else statement[:80]
+            )
             _query_counts[stmt_key] = _query_counts.get(stmt_key, 0) + 1
             _query_total_time[stmt_key] = _query_total_time.get(stmt_key, 0) + elapsed
 
@@ -166,12 +175,14 @@ def get_query_stats() -> dict[str, Any]:
     stats = []
     for stmt, count in _query_counts.items():
         avg_time = (_query_total_time.get(stmt, 0) / count) if count > 0 else 0
-        stats.append({
-            "query": stmt,
-            "count": count,
-            "avg_ms": round(avg_time, 2),
-            "total_ms": round(_query_total_time.get(stmt, 0), 2),
-        })
+        stats.append(
+            {
+                "query": stmt,
+                "count": count,
+                "avg_ms": round(avg_time, 2),
+                "total_ms": round(_query_total_time.get(stmt, 0), 2),
+            }
+        )
     stats.sort(key=lambda x: x["total_ms"], reverse=True)
     return {"total_unique_queries": len(stats), "queries": stats}
 
@@ -183,6 +194,7 @@ def reset_query_stats():
 
 
 # ---- Eager Loading Helper ----
+
 
 def eager_load_options(relations: list[str]):
     """
@@ -200,4 +212,5 @@ def eager_load_options(relations: list[str]):
         List of selectinload options for SQLAlchemy queries.
     """
     from sqlalchemy.orm import selectinload
+
     return [selectinload(relation) for relation in relations]

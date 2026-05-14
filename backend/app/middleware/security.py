@@ -1,17 +1,17 @@
 """
 Rate Limiting & Webhook Security Middleware
 """
-import time
-import hmac
+
 import hashlib
+import hmac
 import logging
+import time
 from typing import Callable, Optional
 
+from app.config import settings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-from starlette.responses import Response, JSONResponse
-
-from app.config import settings
+from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger("security")
 
@@ -20,10 +20,14 @@ try:
 
     def _get_redis():
         try:
-            return _redis.Redis.from_url(settings.REDIS_URL, socket_timeout=2, decode_responses=True)
+            return _redis.Redis.from_url(
+                settings.REDIS_URL, socket_timeout=2, decode_responses=True
+            )
         except Exception:
             return None
+
 except ImportError:
+
     def _get_redis():
         return None
 
@@ -115,5 +119,7 @@ class WebhookAuthMiddleware(BaseHTTPMiddleware):
                 content={"error": "Webhook signature verification failed"},
             )
 
-        logger.info(f"Webhook signature verified from {request.client.host if request.client else 'unknown'}")
+        logger.info(
+            f"Webhook signature verified from {request.client.host if request.client else 'unknown'}"
+        )
         return await call_next(request)

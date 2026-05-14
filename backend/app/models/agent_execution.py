@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, Integer, DateTime, Numeric, Text, Boolean, ForeignKey
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.sql import func
-from .base import BaseModel, GUID
+
+from .base import GUID, BaseModel
 
 
 class AgentExecution(BaseModel):

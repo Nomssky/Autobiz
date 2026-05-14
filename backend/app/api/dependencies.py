@@ -1,17 +1,12 @@
 from typing import Generator, List
 from uuid import UUID
 
+from app.database import SessionLocal
 from fastapi import Depends, HTTPException, Request, status
-from sqlalchemy import create_engine, text, select
-from sqlalchemy.orm import sessionmaker, Session
-
-from app.auth.jwt_handler import verify_token
-from app.config import settings
-
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 # ---- Database Engine & Session ----
-
-from app.database import get_engine, SessionLocal
 
 
 def get_db_session() -> Generator[Session, None, None]:
@@ -28,6 +23,7 @@ def get_db_session() -> Generator[Session, None, None]:
 
 
 # ---- Auth ----
+
 
 def get_current_user(request: Request) -> UUID:
     """Extract the authenticated user's UUID from the request state (set by AuthMiddleware)."""
@@ -61,6 +57,7 @@ def require_role(allowed_roles: List[str]):
         async def archive(user=Depends(require_role(["owner", "admin"]))):
             ...
     """
+
     def _require_role(
         request: Request,
         db: Session = Depends(get_db_session),

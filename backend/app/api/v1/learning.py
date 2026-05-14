@@ -1,14 +1,15 @@
 """Learning agent API endpoints — self-improving agent feedback loop."""
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List, Optional
+
+from typing import Optional
 from uuid import UUID
 
-from app.api.dependencies import get_db_session, require_ceo
 from app.agents.learning.feedback_processor import FeedbackProcessor
 from app.agents.learning.prompt_optimizer import PromptOptimizer
 from app.agents.learning.success_evaluator import SuccessEvaluator
+from app.api.dependencies import get_db_session, require_ceo
 from app.schemas import AgentFeedbackRequest
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/learning", tags=["learning"])
 
@@ -23,15 +24,12 @@ def submit_feedback(
     _: UUID = Depends(require_ceo),
 ):
     """Submit user feedback for agent improvement pipeline."""
+    # Verify business exists
+    from app.models.business import Business
     from app.models.user_feedback import UserFeedback
     from sqlalchemy import select
 
-    # Verify business exists
-    from app.models.business import Business
-
-    result = db.execute(
-        select(Business).where(Business.id == request.business_id)
-    )
+    result = db.execute(select(Business).where(Business.id == request.business_id))
     business = result.scalar_one_or_none()
     if not business:
         raise HTTPException(
@@ -53,9 +51,7 @@ def submit_feedback(
 
     # Process for agent learning
     processor = FeedbackProcessor(db)
-    learning_signal = processor.process_for_agent_learning(
-        request.business_id, feedback
-    )
+    learning_signal = processor.process_for_agent_learning(request.business_id, feedback)
 
     return {
         "feedback_id": str(feedback.id),
@@ -159,9 +155,9 @@ def trigger_retrain(
     _: UUID = Depends(require_ceo),
 ):
     """Trigger the embedding retraining pipeline (async recommended)."""
+    import os
     import subprocess
     import sys
-    import os
 
     script_path = os.path.join(
         os.path.dirname(__file__), "..", "..", "scripts", "retrain_embeddings.py"
@@ -174,4 +170,7 @@ def trigger_retrain(
         stderr=subprocess.DEVNULL,
     )
 
-    return {"status": "retraining_triggered", "message": "Embedding retraining started in background"}
+    return {
+        "status": "retraining_triggered",
+        "message": "Embedding retraining started in background",
+    }

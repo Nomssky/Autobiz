@@ -1,11 +1,11 @@
 """Feedback processor — collects and processes user feedback for agent improvement."""
-from typing import Dict, List, Optional
-from datetime import datetime, timedelta
-from uuid import UUID
+
 import logging
+from datetime import datetime, timedelta
+from typing import Dict, List
+from uuid import UUID
 
 from app.models.user_feedback import UserFeedback
-from app.models.business import Business
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +16,11 @@ class FeedbackProcessor:
     def __init__(self, db_session):
         self.db = db_session
 
-    def collect_feedback_for_business(
-        self, business_id: UUID, days: int = 30
-    ) -> List[Dict]:
+    def collect_feedback_for_business(self, business_id: UUID, days: int = 30) -> List[Dict]:
         """Collect recent feedback for a business."""
         cutoff = datetime.utcnow() - timedelta(days=days)
 
-        from sqlalchemy import select, desc
+        from sqlalchemy import desc, select
 
         result = self.db.execute(
             select(UserFeedback)
@@ -34,9 +32,7 @@ class FeedbackProcessor:
 
         return [self._feedback_to_dict(f) for f in feedbacks]
 
-    def analyze_sentiment_distribution(
-        self, business_id: UUID, days: int = 30
-    ) -> Dict:
+    def analyze_sentiment_distribution(self, business_id: UUID, days: int = 30) -> Dict:
         """Analyze sentiment distribution of feedback."""
         feedbacks = self.collect_feedback_for_business(business_id, days)
 
@@ -59,20 +55,18 @@ class FeedbackProcessor:
             "sentiment_breakdown": sentiment_types,
             "avg_score": round(avg_score, 3),
             "positive_pct": round(
-                sum(1 for f in feedbacks if (f["sentiment_score"] or 0) > 0)
-                / len(feedbacks) * 100,
+                sum(1 for f in feedbacks if (f["sentiment_score"] or 0) > 0) / len(feedbacks) * 100,
                 1,
             ),
             "negative_pct": round(
-                sum(1 for f in feedbacks if (f["sentiment_score"] or 0) < 0)
-                / len(feedbacks) * 100,
+                sum(1 for f in feedbacks if (f["sentiment_score"] or 0) < 0) / len(feedbacks) * 100,
                 1,
             ),
         }
 
     def extract_key_themes(self, business_id: UUID, days: int = 30) -> List[Dict]:
         """Extract key themes from feedback (mock NLP analysis)."""
-        feedbacks = self.collect_feedback_for_business(business_id, days)
+        # feedbacks = self.collect_feedback_for_business(business_id, days)
 
         # In production: use NLP/LLM to cluster and extract themes
         mock_themes = [
@@ -97,9 +91,7 @@ class FeedbackProcessor:
         ]
         return mock_themes
 
-    def generate_improvement_recommendations(
-        self, business_id: UUID, days: int = 30
-    ) -> List[Dict]:
+    def generate_improvement_recommendations(self, business_id: UUID, days: int = 30) -> List[Dict]:
         """Generate actionable improvement recommendations from feedback."""
         analysis = self.analyze_sentiment_distribution(business_id, days)
         themes = self.extract_key_themes(business_id, days)
@@ -107,27 +99,29 @@ class FeedbackProcessor:
         recommendations = []
 
         if analysis["negative_pct"] > 30:
-            recommendations.append({
-                "priority": "high",
-                "category": "urgent_fix",
-                "description": "High negative feedback rate detected. Investigate top complaints.",
-                "estimated_impact": "Customer retention improvement",
-            })
+            recommendations.append(
+                {
+                    "priority": "high",
+                    "category": "urgent_fix",
+                    "description": "High negative feedback rate detected. Investigate top complaints.",
+                    "estimated_impact": "Customer retention improvement",
+                }
+            )
 
         for theme in themes:
             if theme["sentiment"] == "negative" and theme["mentions"] >= 5:
-                recommendations.append({
-                    "priority": "medium",
-                    "category": "feature_improvement",
-                    "description": f"Improve '{theme['theme']}' area ({theme['mentions']} mentions)",
-                    "estimated_impact": f"Reduce complaints about {theme['theme']}",
-                })
+                recommendations.append(
+                    {
+                        "priority": "medium",
+                        "category": "feature_improvement",
+                        "description": f"Improve '{theme['theme']}' area ({theme['mentions']} mentions)",
+                        "estimated_impact": f"Reduce complaints about {theme['theme']}",
+                    }
+                )
 
         return recommendations
 
-    def process_for_agent_learning(
-        self, business_id: UUID, feedback: UserFeedback
-    ) -> Dict:
+    def process_for_agent_learning(self, business_id: UUID, feedback: UserFeedback) -> Dict:
         """Process a single feedback item for agent learning pipeline."""
         learning_signal = {
             "business_id": str(business_id),
@@ -141,23 +135,29 @@ class FeedbackProcessor:
 
         # Determine which agents should learn from this feedback
         if feedback.feedback_type == "bug":
-            learning_signal["learning_actions"].append({
-                "agent": "developer",
-                "action": "fix_bug",
-                "priority": "high" if (feedback.sentiment_score or 0) < -0.5 else "medium",
-            })
+            learning_signal["learning_actions"].append(
+                {
+                    "agent": "developer",
+                    "action": "fix_bug",
+                    "priority": "high" if (feedback.sentiment_score or 0) < -0.5 else "medium",
+                }
+            )
         elif feedback.feedback_type == "feature_request":
-            learning_signal["learning_actions"].append({
-                "agent": "researcher",
-                "action": "evaluate_feature",
-                "priority": "medium",
-            })
+            learning_signal["learning_actions"].append(
+                {
+                    "agent": "researcher",
+                    "action": "evaluate_feature",
+                    "priority": "medium",
+                }
+            )
         elif feedback.feedback_type == "complaint":
-            learning_signal["learning_actions"].append({
-                "agent": "support",
-                "action": "improve_response",
-                "priority": "high",
-            })
+            learning_signal["learning_actions"].append(
+                {
+                    "agent": "support",
+                    "action": "improve_response",
+                    "priority": "high",
+                }
+            )
 
         return learning_signal
 
@@ -171,9 +171,7 @@ class FeedbackProcessor:
             "content": feedback.content,
             "sentiment_score": feedback.sentiment_score,
             "processed_by_ai": feedback.processed_by_ai,
-            "processed_at": feedback.processed_at.isoformat()
-            if feedback.processed_at
-            else None,
+            "processed_at": feedback.processed_at.isoformat() if feedback.processed_at else None,
             "action_taken": feedback.action_taken,
             "created_at": feedback.created_at.isoformat(),
         }

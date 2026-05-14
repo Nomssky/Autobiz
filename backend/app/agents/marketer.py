@@ -1,8 +1,9 @@
-from typing import Dict, Any, List, Optional
-from uuid import UUID
 import json
 import logging
-from app.agents.base_agent import BaseAgent, AgentResult
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from app.agents.base_agent import AgentResult, BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +37,7 @@ class MarketerAgent(BaseAgent):
         return []
 
     async def execute_task(
-        self,
-        task_type: str,
-        input_data: Dict[str, Any],
-        context: Optional[Dict] = None
+        self, task_type: str, input_data: Dict[str, Any], context: Optional[Dict] = None
     ) -> AgentResult:
         if task_type == "create_social_post":
             return await self._create_social_post(input_data)
@@ -56,11 +54,7 @@ class MarketerAgent(BaseAgent):
         elif task_type == "generate_hashtags":
             return await self._generate_hashtags(input_data)
         else:
-            return AgentResult(
-                success=False,
-                output=None,
-                error=f"Unknown task type: {task_type}"
-            )
+            return AgentResult(success=False, output=None, error=f"Unknown task type: {task_type}")
 
     async def _create_social_post(self, data: Dict[str, Any]) -> AgentResult:
         platform = data.get("platform", "twitter")
@@ -72,10 +66,16 @@ class MarketerAgent(BaseAgent):
             tone=data.get("tone", "professional"),
         )
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a social media marketer.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a social media marketer."
+            )
             output = json.loads(response)
-            return AgentResult(success=True, output=output, requires_approval=False,
-                               tokens_used=getattr(self.llm, "last_token_usage", {}))
+            return AgentResult(
+                success=True,
+                output=output,
+                requires_approval=False,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
@@ -90,8 +90,12 @@ class MarketerAgent(BaseAgent):
         try:
             response = await self.llm.ainvoke(prompt, system_prompt="You are a content writer.")
             output = json.loads(response)
-            return AgentResult(success=True, output=output, requires_approval=False,
-                               tokens_used=getattr(self.llm, "last_token_usage", {}))
+            return AgentResult(
+                success=True,
+                output=output,
+                requires_approval=False,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
@@ -113,11 +117,17 @@ Return JSON with:
 - send_timing: suggested send time"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are an email marketing specialist.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are an email marketing specialist."
+            )
             output = json.loads(response)
-            return AgentResult(success=True, output=output, requires_approval=True,
-                               approval_proposal={"title": f"Send campaign: {output.get('subject_line', '')}"},
-                               tokens_used=getattr(self.llm, "last_token_usage", {}))
+            return AgentResult(
+                success=True,
+                output=output,
+                requires_approval=True,
+                approval_proposal={"title": f"Send campaign: {output.get('subject_line', '')}"},
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
@@ -137,16 +147,29 @@ Return JSON with:
 - risk_factors: array of potential risks"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a go-to-market strategist.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a go-to-market strategist."
+            )
             output = json.loads(response)
-            return AgentResult(success=True, output=output, requires_approval=True,
-                               approval_proposal={"title": "Approve launch strategy", "description": f"Budget: ${output.get('budget_allocation', {}).get('total_budget', 0):,.0f}"},
-                               tokens_used=getattr(self.llm, "last_token_usage", {}))
+            return AgentResult(
+                success=True,
+                output=output,
+                requires_approval=True,
+                approval_proposal={
+                    "title": "Approve launch strategy",
+                    "description": f"Budget: ${output.get('budget_allocation', {}).get('total_budget', 0):,.0f}",
+                },
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
     async def _execute_scheduled_content(self, data: Dict[str, Any]) -> AgentResult:
-        return AgentResult(success=True, output={"posts_made": 0, "message": "Content scheduling active"}, requires_approval=False)
+        return AgentResult(
+            success=True,
+            output={"posts_made": 0, "message": "Content scheduling active"},
+            requires_approval=False,
+        )
 
     async def _analyze_performance(self, data: Dict[str, Any]) -> AgentResult:
         prompt = f"""Analyze marketing performance for:
@@ -161,7 +184,9 @@ Return JSON with:
 - recommendations: array of improvement suggestions"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a marketing analytics analyst.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a marketing analytics analyst."
+            )
             output = json.loads(response)
             return AgentResult(success=True, output=output, requires_approval=False)
         except Exception as e:
@@ -178,7 +203,9 @@ Return JSON with:
 - categories: {{high_reach: [], niche: [], branded: []}}"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a social media hashtag strategist.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a social media hashtag strategist."
+            )
             output = json.loads(response)
             return AgentResult(success=True, output=output, requires_approval=False)
         except Exception as e:

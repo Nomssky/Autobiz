@@ -1,20 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, desc
-from sqlalchemy.orm import Session, selectinload
+from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime
 
 from app.api.dependencies import get_db_session, require_ceo
-from app.models.business import Business
 from app.models.agent_task import AgentTask
+from app.models.business import Business
 from app.orchestrator.build_pipeline import run_build_pipeline
-from app.schemas import (
-    BusinessCreate,
-    BusinessResponse,
-    BusinessUpdate,
-    BusinessTimelineResponse,
-)
+from app.schemas import BusinessCreate, BusinessResponse, BusinessTimelineResponse, BusinessUpdate
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import desc, select
+from sqlalchemy.orm import Session, selectinload
 
 router = APIRouter(prefix="/businesses", tags=["businesses"])
 
@@ -45,13 +40,9 @@ def create_business(
 
     # Run build pipeline (creates tasks + approval requests)
     try:
-        pipeline_result = run_build_pipeline(
-            business.id, request.idea, db, ceo_id
-        )
-        business.current_phase = pipeline_result.get(
-            "final_phase", "planning"
-        )
-    except Exception as e:
+        pipeline_result = run_build_pipeline(business.id, request.idea, db, ceo_id)
+        business.current_phase = pipeline_result.get("final_phase", "planning")
+    except Exception:
         business.status = "failed"
 
     business.updated_at = datetime.utcnow()
@@ -73,8 +64,8 @@ def list_businesses(
     _: UUID = Depends(require_ceo),
 ):
     """List all businesses with optional filtering by status and CEO."""
-    query = select(Business).options(selectinload(Business.tasks)).order_by(
-        desc(Business.created_at)
+    query = (
+        select(Business).options(selectinload(Business.tasks)).order_by(desc(Business.created_at))
     )
 
     if status_filter:
@@ -99,9 +90,7 @@ def get_business(
     _: UUID = Depends(require_ceo),
 ):
     """Get business details and current status."""
-    query = select(Business).options(selectinload(Business.tasks)).where(
-        Business.id == business_id
-    )
+    query = select(Business).options(selectinload(Business.tasks)).where(Business.id == business_id)
     result = db.execute(query)
     business = result.scalar_one_or_none()
     if not business:
@@ -189,9 +178,7 @@ def get_business_timeline(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
 
     tasks_result = db.execute(
-        select(AgentTask)
-        .where(AgentTask.business_id == business_id)
-        .order_by(AgentTask.created_at)
+        select(AgentTask).where(AgentTask.business_id == business_id).order_by(AgentTask.created_at)
     )
     tasks = tasks_result.scalars().all()
 

@@ -1,7 +1,8 @@
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session, declarative_base
-from app.config import settings
 import logging
+
+from app.config import settings
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ def get_engine():
                 pool_pre_ping=True,
                 pool_recycle=3600,
                 pool_timeout=settings.DATABASE_POOL_TIMEOUT,
-                echo=settings.DATABASE_ECHO
+                echo=settings.DATABASE_ECHO,
             )
             logger.info("Database engine created successfully")
         except Exception as e:
@@ -28,9 +29,7 @@ def get_engine():
             # Fallback to SQLite for development/testing
             if settings.DEBUG:
                 engine = create_engine(
-                    "sqlite:///./test.db",
-                    connect_args={"check_same_thread": False},
-                    echo=False
+                    "sqlite:///./test.db", connect_args={"check_same_thread": False}, echo=False
                 )
             else:
                 raise
@@ -40,16 +39,7 @@ def get_engine():
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
 
 # Import all models to ensure they are registered before metadata operations
-from app.models import (
-    BaseModel,
-    Business,
-    AgentTask,
-    ApprovalRequest,
-    Deployment,
-    MetricSnapshot,
-    UserFeedback,
-    AgentExecution,
-)
+from app.models import BaseModel  # noqa: E402
 
 Base = BaseModel
 

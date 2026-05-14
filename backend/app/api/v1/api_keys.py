@@ -1,15 +1,13 @@
-import secrets
 import hashlib
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-from uuid import UUID
+import secrets
 from datetime import datetime
+from uuid import UUID
 
-from app.api.dependencies import get_db_session, get_current_user, require_role
-from app.models.base import BaseModel, GUID
-from sqlalchemy import Column, String, Boolean, DateTime, Text
-from sqlalchemy.sql import func
+from app.api.dependencies import get_current_user, get_db_session
+from app.models.base import GUID, BaseModel
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import Boolean, Column, DateTime, String, Text, select
+from sqlalchemy.orm import Session
 
 
 class ApiKey(BaseModel):
@@ -65,12 +63,16 @@ def list_api_keys(
     db: Session = Depends(get_db_session),
     user_id: UUID = Depends(get_current_user),
 ):
-    keys = db.execute(
-        select(ApiKey).where(
-            ApiKey.user_id == user_id,
-            ApiKey.is_active == True,
+    keys = (
+        db.execute(
+            select(ApiKey).where(
+                ApiKey.user_id == user_id,
+                ApiKey.is_active.is_(True),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     return [
         {
@@ -107,7 +109,7 @@ def verify_api_key(key: str, db: Session) -> tuple[UUID, str] | None:
     api_key = db.execute(
         select(ApiKey).where(
             ApiKey.key_hash == key_hash,
-            ApiKey.is_active == True,
+            ApiKey.is_active.is_(True),
         )
     ).scalar_one_or_none()
 

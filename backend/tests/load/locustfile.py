@@ -2,14 +2,16 @@
 Load testing scenarios for AutoBiz Engine API using Locust.
 Simulates realistic API usage patterns with CEO users creating and managing businesses.
 """
+
 import random
-import string
-from locust import HttpUser, task, between, constant_pacing
 from uuid import uuid4
+
+from locust import HttpUser, between, task
 
 
 class CEOUser(HttpUser):
     """Simulates a CEO user interacting with the AutoBiz Engine API."""
+
     wait_time = between(1, 3)
 
     def on_start(self):
@@ -132,13 +134,27 @@ class CEOUser(HttpUser):
     def _generate_idea(self) -> str:
         """Generate a random business idea string."""
         adjectives = ["AI-powered", "Smart", "Automated", "Cloud-based", "Next-gen", "Intelligent"]
-        domains = ["SaaS platform", "Marketplace", "Analytics tool", "Payment system", "CRM suite", "DevOps tool"]
-        suffixes = ["for enterprises", "for SMBs", "for developers", "for healthcare", "for fintech"]
+        domains = [
+            "SaaS platform",
+            "Marketplace",
+            "Analytics tool",
+            "Payment system",
+            "CRM suite",
+            "DevOps tool",
+        ]
+        suffixes = [
+            "for enterprises",
+            "for SMBs",
+            "for developers",
+            "for healthcare",
+            "for fintech",
+        ]
         return f"{random.choice(adjectives)} {random.choice(domains)} {random.choice(suffixes)}"
 
 
 class UnauthenticatedUser(HttpUser):
     """Simulates unauthenticated requests to test auth rejection."""
+
     wait_time = between(2, 5)
 
     @task

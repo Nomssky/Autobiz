@@ -1,4 +1,6 @@
-from app.agents.learning import feedback_processor, prompt_optimizer, success_evaluator
+from app.agents.learning.feedback_processor import FeedbackProcessor
+from app.agents.learning.prompt_optimizer import PromptOptimizer
+from app.agents.learning.success_evaluator import SuccessEvaluator
 
 __all__ = [
     "FeedbackProcessor",

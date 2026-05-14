@@ -1,7 +1,7 @@
-import pytest
-import sys
 import os
-from uuid import uuid4
+import sys
+
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
@@ -16,14 +16,33 @@ def distributor():
 def test_task_routing_exists():
     """Test that all expected task types have routes"""
     expected_tasks = [
-        "validate_business_idea", "market_analysis", "competitor_research",
-        "trend_analysis", "generate_application", "fix_bug", "implement_feature",
-        "deploy", "generate_image", "create_logo", "design_banner", "edit_image",
-        "create_brand_identity", "create_social_post", "write_blog_post",
-        "create_email_campaign", "analyze_performance", "generate_hashtags",
-        "setup_pricing_and_payments", "track_revenue", "calculate_unit_economics",
-        "process_ticket", "auto_respond", "escalate_ticket",
-        "search_knowledge_base", "analyze_sentiment", "generate_support_report",
+        "validate_business_idea",
+        "market_analysis",
+        "competitor_research",
+        "trend_analysis",
+        "generate_application",
+        "fix_bug",
+        "implement_feature",
+        "deploy",
+        "generate_image",
+        "create_logo",
+        "design_banner",
+        "edit_image",
+        "create_brand_identity",
+        "create_social_post",
+        "write_blog_post",
+        "create_email_campaign",
+        "analyze_performance",
+        "generate_hashtags",
+        "setup_pricing_and_payments",
+        "track_revenue",
+        "calculate_unit_economics",
+        "process_ticket",
+        "auto_respond",
+        "escalate_ticket",
+        "search_knowledge_base",
+        "analyze_sentiment",
+        "generate_support_report",
     ]
 
     for task in expected_tasks:
@@ -42,9 +61,7 @@ def test_priority_levels():
 def test_add_task(distributor):
     """Test adding a task to the queue"""
     task_id = distributor.add_task(
-        task_type="market_analysis",
-        input_data={"idea": "Test business"},
-        priority="high"
+        task_type="market_analysis", input_data={"idea": "Test business"}, priority="high"
     )
 
     assert task_id is not None
@@ -56,11 +73,7 @@ def test_add_task(distributor):
 
 def test_add_task_with_dependency(distributor):
     """Test adding a task with dependency tracking"""
-    task_id = distributor.add_task(
-        task_type="market_analysis",
-        input_data={},
-        depends_on=["dep_task_1"]
-    )
+    _ = distributor.add_task(task_type="market_analysis", input_data={}, depends_on=["dep_task_1"])
 
     assert "dep_task_1" in distributor.pending_dependencies
 

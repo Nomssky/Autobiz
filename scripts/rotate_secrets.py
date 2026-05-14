@@ -4,11 +4,11 @@ Secret Rotation Script
 Rotates environment secrets and generates secure random values.
 Usage: python scripts/rotate_secrets.py [--dry-run] [--output .env.new]
 """
-import secrets
-import string
 import argparse
 import os
 import re
+import secrets
+import string
 from datetime import datetime
 
 
@@ -21,6 +21,7 @@ def generate_secret(length: int = 32) -> str:
 def generate_uuid() -> str:
     """Generate a UUID v4."""
     import uuid
+
     return str(uuid.uuid4())
 
 

@@ -1,20 +1,20 @@
-from enum import Enum
-from typing import Dict, Any, List, Optional
-from uuid import UUID
 import asyncio
-from datetime import datetime
-
-from app.agents.researcher import ResearcherAgent
-from app.agents.developer import DeveloperAgent
-from app.agents.designer import DesignerAgent
-from app.agents.marketer import MarketerAgent
-from app.agents.finance import FinanceAgent
-from app.agents.support import SupportAgent
-from app.database import get_db_session
-from app.models import Business, AgentTask
-from app.approval.gateway import approval_gateway
-from app.infrastructure.notification_service import NotificationService
 import logging
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List
+from uuid import UUID
+
+from app.agents.designer import DesignerAgent
+from app.agents.developer import DeveloperAgent
+from app.agents.finance import FinanceAgent
+from app.agents.marketer import MarketerAgent
+from app.agents.researcher import ResearcherAgent
+from app.agents.support import SupportAgent
+from app.approval.gateway import approval_gateway
+from app.database import get_db_session
+from app.infrastructure.notification_service import NotificationService
+from app.models import Business
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ class PhaseManager:
             "designer": DesignerAgent(self.business_id, config.get("designer", {})),
             "marketer": MarketerAgent(self.business_id, config.get("marketer", {})),
             "finance": FinanceAgent(self.business_id, config.get("finance", {})),
-            "support": SupportAgent(self.business_id, config.get("support", {}))
+            "support": SupportAgent(self.business_id, config.get("support", {})),
         }
         logger.info(f"Initialized {len(self.agents)} agents for business {self.business_id}")
 
@@ -67,8 +67,7 @@ class PhaseManager:
         logger.info("Phase 1: Market Research")
         try:
             research_result = await self.agents["researcher"].execute_task(
-                "validate_business_idea",
-                {"idea": business_idea}
+                "validate_business_idea", {"idea": business_idea}
             )
         except Exception as e:
             logger.error(f"Research phase failed: {e}")
@@ -87,13 +86,12 @@ class PhaseManager:
             "business_name": research_out.get("business_name", "Unknown"),
             "description": research_out.get("description", ""),
             "features": research_out.get("recommended_features", []),
-            "tech_stack": research_out.get("tech_stack", "default")
+            "tech_stack": research_out.get("tech_stack", "default"),
         }
 
         try:
             dev_result = await self.agents["developer"].execute_task(
-                "generate_application",
-                dev_spec
+                "generate_application", dev_spec
             )
         except Exception as e:
             logger.error(f"Development phase failed: {e}")
@@ -107,12 +105,13 @@ class PhaseManager:
 
         # If development requires approval, wait for it
         if dev_result.requires_approval and dev_result.approval_proposal:
-            approved = await self._wait_for_approval(
-                dev_result.approval_proposal,
-                urgency="high"
-            )
+            approved = await self._wait_for_approval(dev_result.approval_proposal, urgency="high")
             if not approved:
-                return {"success": False, "phase": "development", "error": "CEO rejected development"}
+                return {
+                    "success": False,
+                    "phase": "development",
+                    "error": "CEO rejected development",
+                }
 
         # --- Phase 3: Design ---
         logger.info("Phase 3: Design")
@@ -122,13 +121,22 @@ class PhaseManager:
                 {
                     "business_name": research_out.get("business_name", "Unknown"),
                     "target_audience": research_out.get("target_audience", []),
-                    "brand_personality": research_out.get("brand_personality", "professional")
-                }
+                    "brand_personality": research_out.get("brand_personality", "professional"),
+                },
             )
         except Exception as e:
             logger.error(f"Design phase failed: {e}")
-            design_result = type("obj", (), {"success": False, "output": {}, "error": str(e),
-                                              "requires_approval": False, "approval_proposal": None})()
+            design_result = type(
+                "obj",
+                (),
+                {
+                    "success": False,
+                    "output": {},
+                    "error": str(e),
+                    "requires_approval": False,
+                    "approval_proposal": None,
+                },
+            )()
 
         if design_result.success:
             phase_results["design"] = design_result.output
@@ -143,13 +151,22 @@ class PhaseManager:
                     "business_description": research_out.get("description", ""),
                     "target_audience": research_out.get("target_audience", []),
                     "unique_selling_points": research_out.get("usp", []),
-                    "launch_timeline": "2 weeks"
-                }
+                    "launch_timeline": "2 weeks",
+                },
             )
         except Exception as e:
             logger.error(f"Marketing phase failed: {e}")
-            marketing_result = type("obj", (), {"success": False, "output": {}, "error": str(e),
-                                                 "requires_approval": False, "approval_proposal": None})()
+            marketing_result = type(
+                "obj",
+                (),
+                {
+                    "success": False,
+                    "output": {},
+                    "error": str(e),
+                    "requires_approval": False,
+                    "approval_proposal": None,
+                },
+            )()
 
         if marketing_result.success:
             phase_results["marketing"] = marketing_result.output
@@ -164,18 +181,26 @@ class PhaseManager:
                     "business_model": research_out.get("business_model", "saas"),
                     "target_cac": research_out.get("estimated_cac", 50),
                     "target_ltv": research_out.get("estimated_ltv", 500),
-                    "features": research_out.get("recommended_features", [])
-                }
+                    "features": research_out.get("recommended_features", []),
+                },
             )
         except Exception as e:
             logger.error(f"Finance phase failed: {e}")
-            finance_result = type("obj", (), {"success": False, "output": {}, "error": str(e),
-                                               "requires_approval": False, "approval_proposal": None})()
+            finance_result = type(
+                "obj",
+                (),
+                {
+                    "success": False,
+                    "output": {},
+                    "error": str(e),
+                    "requires_approval": False,
+                    "approval_proposal": None,
+                },
+            )()
 
         if finance_result.requires_approval and finance_result.approval_proposal:
             approved = await self._wait_for_approval(
-                finance_result.approval_proposal,
-                urgency="high"
+                finance_result.approval_proposal, urgency="high"
             )
             if not approved:
                 return {"success": False, "phase": "finance", "error": "CEO rejected pricing"}
@@ -192,11 +217,15 @@ class PhaseManager:
             "description": f"Ready to launch {research_out.get('business_name', 'business')}",
             "impact_analysis": {
                 "initial_investment": (phase_results.get("finance") or {}).get("setup_cost", 0),
-                "projected_monthly_revenue": (phase_results.get("finance") or {}).get("financial_projections", {}).get("month_12_revenue", 0),
-                "break_even_month": (phase_results.get("finance") or {}).get("financial_projections", {}).get("break_even_month", 6)
+                "projected_monthly_revenue": (phase_results.get("finance") or {})
+                .get("financial_projections", {})
+                .get("month_12_revenue", 0),
+                "break_even_month": (phase_results.get("finance") or {})
+                .get("financial_projections", {})
+                .get("break_even_month", 6),
             },
             "staging_url": (phase_results.get("development") or {}).get("staging_url", ""),
-            "design_preview": (phase_results.get("design") or {}).get("preview_url", "")
+            "design_preview": (phase_results.get("design") or {}).get("preview_url", ""),
         }
 
         approved = await self._wait_for_approval(launch_proposal, urgency="critical")
@@ -208,19 +237,23 @@ class PhaseManager:
         launch_result = await self._execute_launch(phase_results)
 
         if launch_result["success"]:
-            await self._update_phase(BusinessPhase.OPERATING, {"launched_at": datetime.utcnow().isoformat()})
-            await self.notifier.notify_ceo_about_approval({
-                "title": f"Business Launched: {research_out.get('business_name', 'Business')}",
-                "description": f"Successfully launched at {launch_result.get('url', 'N/A')}",
-                "urgency": "normal",
-                "business_id": str(self.business_id),
-                "created_at": datetime.utcnow().isoformat()
-            })
+            await self._update_phase(
+                BusinessPhase.OPERATING, {"launched_at": datetime.utcnow().isoformat()}
+            )
+            await self.notifier.notify_ceo_about_approval(
+                {
+                    "title": f"Business Launched: {research_out.get('business_name', 'Business')}",
+                    "description": f"Successfully launched at {launch_result.get('url', 'N/A')}",
+                    "urgency": "normal",
+                    "business_id": str(self.business_id),
+                    "created_at": datetime.utcnow().isoformat(),
+                }
+            )
 
         return {
             "success": launch_result["success"],
             "business_url": launch_result.get("url"),
-            "phases": phase_results
+            "phases": phase_results,
         }
 
     async def execute_operate_phase(self) -> Dict[str, Any]:
@@ -234,16 +267,12 @@ class PhaseManager:
             self._continuous_support(),
             self._continuous_marketing(),
             self._continuous_monitoring(),
-            self._continuous_optimization()
+            self._continuous_optimization(),
         ]
 
-        results = await asyncio.gather(*operation_tasks, return_exceptions=True)
+        await asyncio.gather(*operation_tasks, return_exceptions=True)
 
-        return {
-            "success": True,
-            "operations_running": len(operation_tasks),
-            "status": "operating"
-        }
+        return {"success": True, "operations_running": len(operation_tasks), "status": "operating"}
 
     async def stop_operate_phase(self):
         """Stop the continuous operation phase"""
@@ -255,8 +284,7 @@ class PhaseManager:
         while self._operation_active:
             try:
                 result = await self.agents["support"].execute_task(
-                    "process_pending_tickets",
-                    {"batch_size": 20}
+                    "process_pending_tickets", {"batch_size": 20}
                 )
 
                 if result.success:
@@ -274,10 +302,7 @@ class PhaseManager:
         """Run marketing agent on schedule"""
         while self._operation_active:
             try:
-                result = await self.agents["marketer"].execute_task(
-                    "execute_scheduled_content",
-                    {}
-                )
+                result = await self.agents["marketer"].execute_task("execute_scheduled_content", {})
 
                 if result.success and result.output.get("posts_made", 0) > 0:
                     logger.info(f"Marketing: Posted {result.output['posts_made']} contents")
@@ -292,10 +317,7 @@ class PhaseManager:
         """Monitor business metrics and alert on anomalies"""
         while self._operation_active:
             try:
-                metrics = await self.agents["finance"].execute_task(
-                    "get_current_metrics",
-                    {}
-                )
+                metrics = await self.agents["finance"].execute_task("get_current_metrics", {})
 
                 if metrics.success:
                     anomalies = await self._detect_anomalies(metrics.output)
@@ -303,15 +325,12 @@ class PhaseManager:
                     for anomaly in anomalies:
                         if anomaly["severity"] == "critical":
                             await self.notifier.send_system_alert(
-                                anomaly["type"],
-                                anomaly["message"],
-                                severity="critical"
+                                anomaly["type"], anomaly["message"], severity="critical"
                             )
 
                         if anomaly["type"] == "revenue_drop":
                             await self.agents["marketer"].execute_task(
-                                "create_retention_campaign",
-                                {"reason": anomaly["message"]}
+                                "create_retention_campaign", {"reason": anomaly["message"]}
                             )
 
                 await asyncio.sleep(300)  # Check every 5 minutes
@@ -325,8 +344,7 @@ class PhaseManager:
         while self._operation_active:
             try:
                 performance = await self.agents["finance"].execute_task(
-                    "analyze_performance",
-                    {"period": "daily"}
+                    "analyze_performance", {"period": "daily"}
                 )
 
                 if performance.success and performance.output.get("optimization_opportunities"):
@@ -334,11 +352,12 @@ class PhaseManager:
                         if opportunity.get("confidence", 0) > 0.8:
                             if opportunity.get("type") == "price_optimization":
                                 result = await self.agents["finance"].execute_task(
-                                    "optimize_pricing",
-                                    opportunity
+                                    "optimize_pricing", opportunity
                                 )
                                 if result.requires_approval:
-                                    logger.info(f"Price optimization needs approval: {result.approval_proposal}")
+                                    logger.info(
+                                        f"Price optimization needs approval: {result.approval_proposal}"
+                                    )
 
                 await asyncio.sleep(3600)  # Check every hour
 
@@ -351,6 +370,7 @@ class PhaseManager:
         try:
             with get_db_session() as session:
                 from sqlalchemy import select
+
                 result = await session.execute(
                     select(Business).where(Business.id == self.business_id)
                 )
@@ -367,10 +387,7 @@ class PhaseManager:
         """Wait for CEO approval on a proposal"""
 
         approval_id = await approval_gateway.create_approval_request(
-            self.business_id,
-            None,
-            proposal,
-            urgency
+            self.business_id, None, proposal, urgency
         )
 
         logger.info(f"Waiting for approval (ID: {approval_id}, urgency: {urgency})")
@@ -383,6 +400,7 @@ class PhaseManager:
                 with get_db_session() as session:
                     from app.models import ApprovalRequest
                     from sqlalchemy import select
+
                     result = await session.execute(
                         select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
                     )
@@ -415,11 +433,13 @@ class PhaseManager:
                 deploy_result = await self.agents["developer"].execute_task(
                     "deploy",
                     {
-                        "environment": "production" if dev_output.get("ready_for_deployment") else "staging",
+                        "environment": (
+                            "production" if dev_output.get("ready_for_deployment") else "staging"
+                        ),
                         "version": dev_output.get("version", "1.0.0"),
                         "code": dev_output,
-                        "changelog": "Initial launch"
-                    }
+                        "changelog": "Initial launch",
+                    },
                 )
                 if not deploy_result.success:
                     return {"success": False, "error": deploy_result.error}
@@ -432,7 +452,7 @@ class PhaseManager:
             marketing_budget = (phase_results.get("finance") or {}).get("setup_cost", 1000)
             await self.agents["marketer"].execute_task(
                 "activate_launch_campaigns",
-                {"launch_date": datetime.utcnow().isoformat(), "budget": marketing_budget}
+                {"launch_date": datetime.utcnow().isoformat(), "budget": marketing_budget},
             )
         except Exception as e:
             logger.warning(f"Marketing activation failed: {e}")
@@ -441,6 +461,7 @@ class PhaseManager:
         try:
             with get_db_session() as session:
                 from sqlalchemy import select
+
                 result = await session.execute(
                     select(Business).where(Business.id == self.business_id)
                 )
@@ -454,8 +475,10 @@ class PhaseManager:
 
         return {
             "success": True,
-            "url": (phase_results.get("development") or {}).get("staging_url", "http://localhost:8000"),
-            "marketing_active": True
+            "url": (phase_results.get("development") or {}).get(
+                "staging_url", "http://localhost:8000"
+            ),
+            "marketing_active": True,
         }
 
     async def _detect_anomalies(self, metrics: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -463,25 +486,31 @@ class PhaseManager:
         anomalies = []
 
         if metrics.get("revenue_change_percent", 0) < -20:
-            anomalies.append({
-                "type": "revenue_drop",
-                "severity": "critical",
-                "message": f"Revenue dropped {abs(metrics['revenue_change_percent'])}%"
-            })
+            anomalies.append(
+                {
+                    "type": "revenue_drop",
+                    "severity": "critical",
+                    "message": f"Revenue dropped {abs(metrics['revenue_change_percent'])}%",
+                }
+            )
 
         if metrics.get("churn_rate", 0) > 0.1:
-            anomalies.append({
-                "type": "high_churn",
-                "severity": "high",
-                "message": f"Churn rate at {metrics['churn_rate'] * 100}%"
-            })
+            anomalies.append(
+                {
+                    "type": "high_churn",
+                    "severity": "high",
+                    "message": f"Churn rate at {metrics['churn_rate'] * 100}%",
+                }
+            )
 
         if metrics.get("bug_count", 0) > 10:
-            anomalies.append({
-                "type": "bug_spike",
-                "severity": "high",
-                "message": f"{metrics['bug_count']} active bugs reported"
-            })
+            anomalies.append(
+                {
+                    "type": "bug_spike",
+                    "severity": "high",
+                    "message": f"{metrics['bug_count']} active bugs reported",
+                }
+            )
 
         return anomalies
 
@@ -490,6 +519,7 @@ class PhaseManager:
         try:
             with get_db_session() as session:
                 from sqlalchemy import select
+
                 result = await session.execute(
                     select(Business).where(Business.id == self.business_id)
                 )
@@ -497,5 +527,11 @@ class PhaseManager:
                 return business.config if business else {}
         except Exception as e:
             logger.error(f"Config load failed: {e}")
-            return {"researcher": {}, "developer": {}, "designer": {},
-                    "marketer": {}, "finance": {}, "support": {}}
+            return {
+                "researcher": {},
+                "developer": {},
+                "designer": {},
+                "marketer": {},
+                "finance": {},
+                "support": {},
+            }

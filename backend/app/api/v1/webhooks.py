@@ -1,12 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
-from typing import Optional, Dict, Any
-from uuid import UUID
 from datetime import datetime
-from sqlalchemy.orm import Session
+from typing import Any, Dict
+from uuid import UUID
 
 from app.api.dependencies import get_db_session
-from app.models.subscription import Subscription, TIER_LIMITS
+from app.models.subscription import TIER_LIMITS, Subscription
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
@@ -85,9 +85,9 @@ async def stripe_subscription_webhook(
     if not stripe_sub_id:
         return {"status": "ignored"}
 
-    sub = db.query(Subscription).filter(
-        Subscription.stripe_subscription_id == stripe_sub_id
-    ).first()
+    sub = (
+        db.query(Subscription).filter(Subscription.stripe_subscription_id == stripe_sub_id).first()
+    )
 
     if not sub:
         return {"status": "not_found"}

@@ -1,8 +1,9 @@
-from typing import Dict, Any, List, Optional
-from uuid import UUID
 import json
 import logging
-from app.agents.base_agent import BaseAgent, AgentResult
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from app.agents.base_agent import AgentResult, BaseAgent
 from app.agents.schemas.finance_output import FinanceOutput
 
 logger = logging.getLogger(__name__)
@@ -38,10 +39,7 @@ class FinanceAgent(BaseAgent):
         return []
 
     async def execute_task(
-        self,
-        task_type: str,
-        input_data: Dict[str, Any],
-        context: Optional[Dict] = None
+        self, task_type: str, input_data: Dict[str, Any], context: Optional[Dict] = None
     ) -> AgentResult:
         if task_type == "setup_pricing_and_payments":
             return await self._setup_pricing_and_payments(input_data)
@@ -64,11 +62,7 @@ class FinanceAgent(BaseAgent):
         elif task_type == "optimize_pricing":
             return await self._optimize_pricing(input_data)
         else:
-            return AgentResult(
-                success=False,
-                output=None,
-                error=f"Unknown task type: {task_type}"
-            )
+            return AgentResult(success=False, output=None, error=f"Unknown task type: {task_type}")
 
     async def _setup_pricing_and_payments(self, params: Dict[str, Any]) -> AgentResult:
         prompt = FINANCIAL_PROMPT.format(
@@ -103,8 +97,12 @@ Return JSON with pricing_tiers array of {{name, price, currency, billing_cycle, 
         try:
             response = await self.llm.ainvoke(prompt, system_prompt="You are a pricing strategist.")
             output = json.loads(response)
-            return AgentResult(success=True, output=output, requires_approval=True,
-                               tokens_used=getattr(self.llm, "last_token_usage", {}))
+            return AgentResult(
+                success=True,
+                output=output,
+                requires_approval=True,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
@@ -123,8 +121,12 @@ Return JSON with metrics: {{mrr, arr, new_revenue, churned_revenue, total_custom
         try:
             response = await self.llm.ainvoke(prompt, system_prompt="You are a revenue analyst.")
             output = json.loads(response)
-            return AgentResult(success=True, output=output, requires_approval=False,
-                               tokens_used=getattr(self.llm, "last_token_usage", {}))
+            return AgentResult(
+                success=True,
+                output=output,
+                requires_approval=False,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
@@ -165,10 +167,16 @@ Operating costs: {params.get('operating_costs', 25000)}
 Return JSON with monthly_projections array of {{month, revenue, cost, profit, cumulative_profit}}
 and summary with {{projected_mrr_12m, break_even_month}}"""
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a financial modeling analyst.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a financial modeling analyst."
+            )
             output = json.loads(response)
-            return AgentResult(success=True, output=output, requires_approval=False,
-                               tokens_used=getattr(self.llm, "last_token_usage", {}))
+            return AgentResult(
+                success=True,
+                output=output,
+                requires_approval=False,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
@@ -199,24 +207,35 @@ Return JSON with: {{revenue_change_percent, expense_change_percent, profit_margi
 optimization_opportunities: [{{type, description, confidence, estimated_impact}}],
 anomalies: [], benchmarks: {{industry_avg_conversion, industry_avg_churn}}}}"""
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a financial performance analyst.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a financial performance analyst."
+            )
             output = json.loads(response)
             return AgentResult(success=True, output=output, requires_approval=False)
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
     async def _optimize_pricing(self, params: Dict[str, Any]) -> AgentResult:
-        prompt = f"""Optimize pricing strategy for:
+        prompt = """Optimize pricing strategy for:
 Current price sensitivity: moderate
 Competitor positioning: mid-market
 
-Return JSON with: {{current_analysis: {{price_sensitivity, demand_elasticity, competitor_positioning}},
-recommendation: {{action, details, expected_impact}},
-implementation_steps: []}}"""
+Return JSON with: {current_analysis: {price_sensitivity, demand_elasticity, competitor_positioning},
+recommendation: {action, details, expected_impact},
+implementation_steps: []}"""
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a pricing optimization analyst.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a pricing optimization analyst."
+            )
             output = json.loads(response)
-            return AgentResult(success=True, output=output, requires_approval=True,
-                               approval_proposal={"title": "Approve pricing changes", "description": output.get("recommendation", {}).get("action", "")})
+            return AgentResult(
+                success=True,
+                output=output,
+                requires_approval=True,
+                approval_proposal={
+                    "title": "Approve pricing changes",
+                    "description": output.get("recommendation", {}).get("action", ""),
+                },
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))

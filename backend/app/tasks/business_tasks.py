@@ -1,8 +1,8 @@
 """
 Business-related background tasks (Celery workers).
 """
+
 from celery import current_app
-from app.config import settings
 
 
 @current_app.task(bind=True, max_retries=3, default_retry_delay=60)
@@ -44,8 +44,8 @@ def update_business_metrics(self, business_id: str):
     Refresh metrics for a business.
     """
     try:
-        from app.database import SessionLocal
         from app.api.v1.metrics import get_metric_summary
+        from app.database import SessionLocal
         from sqlalchemy.orm import Session
 
         db: Session = SessionLocal()

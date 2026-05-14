@@ -2,11 +2,10 @@
 Celery Configuration & Task Batching
 Optimizes background task processing for the AutoBiz Engine.
 """
-from celery import Celery
-from kombu import Queue, Exchange
 
 from app.config import settings
-
+from celery import Celery
+from kombu import Exchange, Queue
 
 # ---- Celery App ----
 celery_app = Celery(
@@ -29,7 +28,6 @@ celery_app.conf.update(
         "app.tasks.business_tasks.*": {"queue": "business"},
         "app.tasks.agent_tasks.*": {"queue": "agent"},
     },
-
     # Queue definitions with priorities
     task_queues=[
         Queue("critical", Exchange("critical"), routing_key="critical"),
@@ -37,7 +35,6 @@ celery_app.conf.update(
         Queue("business", Exchange("business"), routing_key="business"),
         Queue("batch", Exchange("batch"), routing_key="batch"),
     ],
-
     # Quality of Service
     worker_prefetch_multiplier=settings.CELERY_WORKER_PREFETCH_MULTIPLIER,
     task_acks_late=True,
@@ -45,16 +42,13 @@ celery_app.conf.update(
     task_track_started=settings.CELERY_TASK_TRACK_STARTED,
     task_time_limit=settings.CELERY_TASK_TIME_LIMIT,
     task_soft_time_limit=settings.CELERY_TASK_SOFT_TIME_LIMIT,
-
     # Serialization
     task_serializer="json",
     result_serializer="json",
     accept_content=["json"],
-
     # Retry & Reliability
     task_default_retry_delay=60,
     task_max_retries=3,
-
     # Beat schedule for periodic tasks
     beat_schedule={
         "aggregate-metrics-every-5min": {
@@ -73,11 +67,9 @@ celery_app.conf.update(
             "options": {"queue": "batch"},
         },
     },
-
     # Worker optimization
     worker_max_tasks_per_child=1000,  # Restart worker after 1000 tasks (prevent memory leaks)
     worker_disable_rate_limits=False,
-
     # Monitoring
     worker_send_task_events=True,
     task_send_sent_event=True,
@@ -85,6 +77,7 @@ celery_app.conf.update(
 
 
 # ---- Batching Utilities ----
+
 
 class TaskBatcher:
     """

@@ -2,21 +2,21 @@
 Docker-based Code Sandbox
 Execute code in isolated, ephemeral Docker containers with resource limits and timeouts.
 """
-import os
-import json
-import time
-import uuid
-import signal
-import tarfile
+
 import io
 import logging
-from typing import Optional, Dict, Any, List
+import signal
+import tarfile
+import time
+import uuid
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 try:
     import docker
+
     DOCKER_AVAILABLE = True
 except ImportError:
     DOCKER_AVAILABLE = False
@@ -26,6 +26,7 @@ except ImportError:
 @dataclass
 class SandboxConfig:
     """Configuration for a sandbox execution."""
+
     image: str = "python:3.11-slim"
     timeout_seconds: int = 30
     memory_limit: str = "256m"
@@ -39,6 +40,7 @@ class SandboxConfig:
 @dataclass
 class SandboxResult:
     """Result of a sandbox execution."""
+
     id: str
     exit_code: int
     stdout: str
@@ -85,10 +87,7 @@ class CodeSandbox:
         return f"sandbox-{uuid.uuid4().hex[:12]}"
 
     def execute_python(
-        self,
-        code: str,
-        timeout: int = None,
-        memory_limit: str = None
+        self, code: str, timeout: int = None, memory_limit: str = None
     ) -> SandboxResult:
         """
         Execute Python code in an isolated Docker container.
@@ -139,9 +138,9 @@ class CodeSandbox:
             self._active_containers[sandbox_id] = container
 
             # Copy script into container using tarfile
-            script_content = wrapped_code.encode('utf-8')
+            script_content = wrapped_code.encode("utf-8")
             tar_buffer = io.BytesIO()
-            with tarfile.open(fileobj=tar_buffer, mode='w') as tar:
+            with tarfile.open(fileobj=tar_buffer, mode="w") as tar:
                 info = tarfile.TarInfo(name=script_path.lstrip("/"))
                 info.size = len(script_content)
                 tar.addfile(info, io.BytesIO(script_content))
@@ -167,26 +166,26 @@ class CodeSandbox:
             stderr = ""
             try:
                 logs = container.logs(stdout=True, stderr=True)
-                output = logs.decode('utf-8', errors='replace')
+                output = logs.decode("utf-8", errors="replace")
                 # Docker interleaves stdout/stderr, split roughly
-                lines = output.split('\n')
+                lines = output.split("\n")
                 stdout_lines = []
                 stderr_lines = []
                 for line in lines:
-                    if 'STDERR' in line:
-                        stderr_lines.append(line.replace('STDERR:', ''))
+                    if "STDERR" in line:
+                        stderr_lines.append(line.replace("STDERR:", ""))
                     else:
                         stdout_lines.append(line)
-                stdout = '\n'.join(stdout_lines)
-                stderr = '\n'.join(stderr_lines)
+                stdout = "\n".join(stdout_lines)
+                stderr = "\n".join(stderr_lines)
             except Exception as e:
                 stderr = f"Failed to read output: {e}"
 
             # Trim output to max size
             if len(stdout) > self.config.max_output_size:
-                stdout = stdout[:self.config.max_output_size] + "\n... [output truncated]"
+                stdout = stdout[: self.config.max_output_size] + "\n... [output truncated]"
             if len(stderr) > self.config.max_output_size:
-                stderr = stderr[:self.config.max_output_size] + "\n... [output truncated]"
+                stderr = stderr[: self.config.max_output_size] + "\n... [output truncated]"
 
             return SandboxResult(
                 id=sandbox_id,
@@ -212,13 +211,10 @@ class CodeSandbox:
             self._cleanup_container(sandbox_id)
 
     def execute_from_file(
-        self,
-        file_path: str,
-        args: List[str] = None,
-        timeout: int = None
+        self, file_path: str, args: List[str] = None, timeout: int = None
     ) -> SandboxResult:
         """Execute a Python file inside the sandbox."""
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             code = f.read()
         # Add argument simulation
         if args:
@@ -282,4 +278,3 @@ __builtins__.__import__ = _safe_import
         """Kill and remove all active sandboxes."""
         for sandbox_id in list(self._active_containers.keys()):
             self.kill(sandbox_id)
-

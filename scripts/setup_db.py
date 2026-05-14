@@ -11,17 +11,14 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
 
 def get_database_url():
     """Get database URL from environment or use default."""
-    return os.getenv(
-        "DATABASE_URL",
-        "postgresql://user:password@localhost/autobiz_engine"
-    )
+    return os.getenv("DATABASE_URL", "postgresql://user:password@localhost/autobiz_engine")
 
 
 def init_database():
     """Initialize database tables from SQLAlchemy models."""
     from app.database import engine, init_db
 
-    print(f"Connecting to database...")
+    print("Connecting to database...")
     print(f"Engine: {engine.url}")
 
     try:
@@ -31,10 +28,10 @@ def init_database():
 
         # Verify tables exist
         from sqlalchemy import inspect
+
         inspector = inspect(engine)
         tables = inspector.get_table_names()
-        print(f"
-Tables created ({len(tables)}):")
+        print(f"\nTables created ({len(tables)}):")
         for table in sorted(tables):
             print(f"  - {table}")
 
@@ -47,7 +44,7 @@ Tables created ({len(tables)}):")
 
 def drop_database():
     """Drop all database tables."""
-    from app.database import engine, drop_db
+    from app.database import drop_db, engine
 
     confirm = input("Are you sure you want to drop ALL tables? (yes/no): ")
     if confirm.lower() != "yes":
@@ -60,6 +57,7 @@ def drop_database():
 
         # Verify tables are gone
         from sqlalchemy import inspect
+
         inspector = inspect(engine)
         tables = inspector.get_table_names()
         if tables:
@@ -80,10 +78,7 @@ def run_migrations():
 
     backend_dir = Path(__file__).parent.parent / "backend"
     result = subprocess.run(
-        ["alembic", "upgrade", "head"],
-        cwd=str(backend_dir),
-        capture_output=True,
-        text=True
+        ["alembic", "upgrade", "head"], cwd=str(backend_dir), capture_output=True, text=True
     )
 
     if result.returncode == 0:
@@ -114,13 +109,9 @@ def check_connection():
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="AutoBiz Engine Database Setup"
-    )
+    parser = argparse.ArgumentParser(description="AutoBiz Engine Database Setup")
     parser.add_argument(
-        "action",
-        choices=["init", "drop", "migrate", "check", "full"],
-        help="Action to perform"
+        "action", choices=["init", "drop", "migrate", "check", "full"], help="Action to perform"
     )
 
     args = parser.parse_args()
@@ -138,8 +129,7 @@ def main():
         check_connection()
         init_database()
         run_migrations()
-        print("
-✅ Full setup complete!")
+        print("\n✅ Full setup complete!")
 
 
 if __name__ == "__main__":

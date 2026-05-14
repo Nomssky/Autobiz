@@ -1,8 +1,9 @@
-from typing import Dict, Any, List, Optional
-from uuid import UUID
 import json
 import logging
-from app.agents.base_agent import BaseAgent, AgentResult
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from app.agents.base_agent import AgentResult, BaseAgent
 from app.agents.schemas.developer_output import DeveloperOutput
 
 logger = logging.getLogger(__name__)
@@ -37,10 +38,7 @@ class DeveloperAgent(BaseAgent):
         return []
 
     async def execute_task(
-        self,
-        task_type: str,
-        input_data: Dict[str, Any],
-        context: Optional[Dict] = None
+        self, task_type: str, input_data: Dict[str, Any], context: Optional[Dict] = None
     ) -> AgentResult:
         if task_type == "generate_application":
             return await self._generate_full_application(input_data)
@@ -51,11 +49,7 @@ class DeveloperAgent(BaseAgent):
         elif task_type == "deploy":
             return await self._handle_deployment(input_data)
         else:
-            return AgentResult(
-                success=False,
-                output=None,
-                error=f"Unknown task type: {task_type}"
-            )
+            return AgentResult(success=False, output=None, error=f"Unknown task type: {task_type}")
 
     async def _generate_full_application(self, spec: Dict[str, Any]) -> AgentResult:
         business_name = spec.get("business_name", "Unknown")
@@ -69,7 +63,9 @@ class DeveloperAgent(BaseAgent):
         )
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a senior software architect.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a senior software architect."
+            )
             output = json.loads(response)
             validated = DeveloperOutput(**output)
 
@@ -79,11 +75,15 @@ class DeveloperAgent(BaseAgent):
                 success=True,
                 output=validated.model_dump(),
                 requires_approval=requires_approval,
-                approval_proposal={
-                    "title": f"Approve architecture for {business_name}",
-                    "description": f"Estimated {validated.timeline_weeks} weeks, ${validated.estimated_cost_usd:,.0f}",
-                    "impact": f"Tech stack: {', '.join(validated.tech_stack[:3])}",
-                } if requires_approval else None,
+                approval_proposal=(
+                    {
+                        "title": f"Approve architecture for {business_name}",
+                        "description": f"Estimated {validated.timeline_weeks} weeks, ${validated.estimated_cost_usd:,.0f}",
+                        "impact": f"Tech stack: {', '.join(validated.tech_stack[:3])}",
+                    }
+                    if requires_approval
+                    else None
+                ),
                 tokens_used=getattr(self.llm, "last_token_usage", {}),
             )
         except Exception as e:
@@ -108,7 +108,9 @@ Return JSON with:
 - tests_to_run: array of test suggestions"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a senior software engineer debugging an issue.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a senior software engineer debugging an issue."
+            )
             output = json.loads(response)
             auto_deploy = severity == "critical"
 
@@ -116,10 +118,14 @@ Return JSON with:
                 success=True,
                 output={**output, "fix_ready": True},
                 requires_approval=not auto_deploy,
-                approval_proposal={
-                    "title": f"Deploy bug fix: {description[:50]}",
-                    "description": output.get("fix_summary", ""),
-                } if not auto_deploy else None,
+                approval_proposal=(
+                    {
+                        "title": f"Deploy bug fix: {description[:50]}",
+                        "description": output.get("fix_summary", ""),
+                    }
+                    if not auto_deploy
+                    else None
+                ),
                 tokens_used=getattr(self.llm, "last_token_usage", {}),
             )
         except Exception as e:
@@ -145,21 +151,32 @@ Return JSON with:
 - test_strategy: testing approach"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a software engineer planning a feature implementation.")
+            response = await self.llm.ainvoke(
+                prompt,
+                system_prompt="You are a software engineer planning a feature implementation.",
+            )
             output = json.loads(response)
 
-            requires_approval = output.get("changes_database", False) or output.get("breaking_changes", False) or output.get("estimated_hours", 0) > 8
+            requires_approval = (
+                output.get("changes_database", False)
+                or output.get("breaking_changes", False)
+                or output.get("estimated_hours", 0) > 8
+            )
 
             return AgentResult(
                 success=True,
                 output=output,
                 requires_approval=requires_approval,
-                approval_proposal={
-                    "title": f"Feature: {name}",
-                    "description": output.get("implementation_summary", ""),
-                    "estimated_hours": output.get("estimated_hours", 0),
-                    "breaking_changes": output.get("breaking_changes", False),
-                } if requires_approval else None,
+                approval_proposal=(
+                    {
+                        "title": f"Feature: {name}",
+                        "description": output.get("implementation_summary", ""),
+                        "estimated_hours": output.get("estimated_hours", 0),
+                        "breaking_changes": output.get("breaking_changes", False),
+                    }
+                    if requires_approval
+                    else None
+                ),
                 tokens_used=getattr(self.llm, "last_token_usage", {}),
             )
         except Exception as e:
@@ -179,7 +196,7 @@ Return JSON with:
                 approval_proposal={
                     "title": f"Deploy to Production: {version}",
                     "description": changelog or "Standard production deployment",
-                }
+                },
             )
 
         return AgentResult(

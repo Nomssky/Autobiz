@@ -1,6 +1,6 @@
 """CrewAI task definitions for all agent roles."""
-import json
-from typing import Dict, Any, Optional
+
+from typing import Any, Dict
 
 
 def create_research_task(idea: str, business_name: str) -> Dict[str, Any]:
@@ -65,7 +65,9 @@ def create_design_task(idea: str, business_name: str) -> Dict[str, Any]:
     }
 
 
-def create_development_task(idea: str, tech_stack: str = "Python, FastAPI, React") -> Dict[str, Any]:
+def create_development_task(
+    idea: str, tech_stack: str = "Python, FastAPI, React"
+) -> Dict[str, Any]:
     """Create application development task for CrewAI."""
     return {
         "role": "Full Stack Developer",

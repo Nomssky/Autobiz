@@ -1,10 +1,10 @@
-from celery import Task
-from app.workers.celery_app import celery_app
-from app.orchestrator.phase_manager import PhaseManager
-from app.infrastructure.notification_service import NotificationService
-from uuid import UUID
-import logging
 import asyncio
+import logging
+from uuid import UUID
+
+from app.infrastructure.notification_service import NotificationService
+from app.workers.celery_app import celery_app
+from celery import Task
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class OperateTask(Task):
                     notifier.send_system_alert(
                         "operation_failure",
                         f"Operation task failed for {business_id}: {str(exc)}",
-                        severity="high"
+                        severity="high",
                     )
                 )
             except Exception:
@@ -37,7 +37,6 @@ async def continuous_support(self, business_id: str, duration_seconds: int = 360
 
     try:
         from app.agents.support import SupportAgent
-        from app.config import settings
 
         agent = SupportAgent(UUID(business_id), {})
         end_time = asyncio.get_event_loop().time() + duration_seconds
@@ -45,10 +44,7 @@ async def continuous_support(self, business_id: str, duration_seconds: int = 360
 
         while asyncio.get_event_loop().time() < end_time:
             try:
-                result = await agent.execute_task(
-                    "process_pending_tickets",
-                    {"batch_size": 20}
-                )
+                result = await agent.execute_task("process_pending_tickets", {"batch_size": 20})
 
                 if result.success:
                     count = result.output.get("processed_count", 0)
@@ -85,10 +81,7 @@ async def continuous_marketing(self, business_id: str, duration_seconds: int = 7
 
         while asyncio.get_event_loop().time() < end_time:
             try:
-                result = await agent.execute_task(
-                    "execute_scheduled_content",
-                    {}
-                )
+                result = await agent.execute_task("execute_scheduled_content", {})
 
                 if result.success and result.output.get("posts_made", 0) > 0:
                     posts_created += result.output["posts_made"]
@@ -118,16 +111,11 @@ async def send_support_report(business_id: str, period: str = "weekly"):
     try:
         agent = SupportAgent(UUID(business_id), {})
         result = await agent.execute_task(
-            "generate_support_report",
-            {"period": period, "format": "summary"}
+            "generate_support_report", {"period": period, "format": "summary"}
         )
 
         if result.success:
-            return {
-                "status": "completed",
-                "business_id": business_id,
-                "report": result.output
-            }
+            return {"status": "completed", "business_id": business_id, "report": result.output}
         else:
             return {"status": "failed", "error": result.error}
 

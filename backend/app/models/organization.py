@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, ForeignKey, UniqueConstraint
-from .base import BaseModel, GUID
+from sqlalchemy import Column, ForeignKey, String, UniqueConstraint
+
+from .base import GUID, BaseModel
 
 
 class Organization(BaseModel):
@@ -18,6 +19,4 @@ class OrgMembership(BaseModel):
     user_id = Column(GUID(), nullable=False)
     role = Column(String(50), nullable=False, default="viewer")
 
-    __table_args__ = (
-        UniqueConstraint("org_id", "user_id", name="uq_org_user"),
-    )
+    __table_args__ = (UniqueConstraint("org_id", "user_id", name="uq_org_user"),)

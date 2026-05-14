@@ -2,15 +2,15 @@
 Test scenarios for creating 100 businesses simultaneously.
 Run with: pytest tests/load/test_scenarios.py -v --tb=short
 """
-import pytest
+
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from uuid import uuid4
-from starlette.testclient import TestClient
 
-from app.main import app
+import pytest
 from app.api.dependencies import get_db_session
-
+from app.main import app
+from starlette.testclient import TestClient
 
 NUM_BUSINESSES = 100
 MAX_WORKERS = 20  # Concurrent threads
@@ -19,6 +19,7 @@ MAX_WORKERS = 20  # Concurrent threads
 def _override_get_db():
     """Override dependency — reuse same session for all concurrent requests."""
     from app.database import SessionLocal
+
     db = SessionLocal()
     try:
         yield db
@@ -74,7 +75,9 @@ class TestConcurrentBusinessCreation:
         if errors:
             print(f"❌ Errors: {error_count}")
             for err in errors[:5]:  # Show first 5 errors
-                print(f"   Index {err['index']}: status={err['status_code']}, error={err.get('error', 'N/A')}")
+                print(
+                    f"   Index {err['index']}: status={err['status_code']}, error={err.get('error', 'N/A')}"
+                )
 
         # Assertions
         assert success_count == NUM_BUSINESSES, (
@@ -116,7 +119,9 @@ class TestConcurrentBusinessCreation:
                 else:
                     list_errors.append(result)
 
-        assert len(list_results) == 20, f"Expected 20 successful list calls, got {len(list_results)}"
+        assert (
+            len(list_results) == 20
+        ), f"Expected 20 successful list calls, got {len(list_results)}"
         assert len(list_errors) == 0, f"List errors during load: {list_errors}"
 
     def test_api_responsiveness_under_load(self, db_session):
@@ -127,7 +132,7 @@ class TestConcurrentBusinessCreation:
         for i in range(50):
             ceo_id = str(uuid4())
             start = time.time()
-            resp = client.post(
+            _ = client.post(
                 "/api/v1/businesses/create",
                 json={"idea": f"Perf test business {i}", "ceo_id": ceo_id},
             )

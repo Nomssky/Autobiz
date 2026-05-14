@@ -1,11 +1,10 @@
-from celery import Task
-from app.workers.celery_app import celery_app
-from app.orchestrator.phase_manager import PhaseManager
-from app.orchestrator.crew_runner import CrewRunner
-from app.orchestrator.task_distributor import TaskDistributor
-from app.infrastructure.notification_service import NotificationService
-from uuid import UUID
 import logging
+from uuid import UUID
+
+from app.infrastructure.notification_service import NotificationService
+from app.orchestrator.phase_manager import PhaseManager
+from app.workers.celery_app import celery_app
+from celery import Task
 
 logger = logging.getLogger(__name__)
 
@@ -20,11 +19,12 @@ class BuildTask(Task):
             notifier = NotificationService()
             try:
                 import asyncio
+
                 asyncio.run(
                     notifier.send_system_alert(
                         "build_failure",
                         f"Build process failed for business {business_id}: {str(exc)}",
-                        severity="critical"
+                        severity="critical",
                     )
                 )
             except Exception:
@@ -54,7 +54,7 @@ async def build_business(self, business_id: str, idea: str):
             "business_id": business_id,
             "phases_completed": list(result.get("phases", {}).keys()),
             "error": result.get("error"),
-            "business_url": result.get("business_url")
+            "business_url": result.get("business_url"),
         }
 
     except Exception as exc:
@@ -76,7 +76,7 @@ async def operate_business(self, business_id: str):
         return {
             "status": "operating",
             "business_id": business_id,
-            "operations_running": result.get("operations_running", 0)
+            "operations_running": result.get("operations_running", 0),
         }
 
     except Exception as exc:

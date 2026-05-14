@@ -1,10 +1,11 @@
-from celery import Task
-from app.workers.celery_app import celery_app
+import logging
+from uuid import UUID
+
 from app.agents.finance import FinanceAgent
 from app.agents.support import SupportAgent
 from app.infrastructure.notification_service import NotificationService
-from uuid import UUID
-import logging
+from app.workers.celery_app import celery_app
+from celery import Task
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +47,7 @@ async def monitor_business_metrics(self, business_id: str):
                 notifier = NotificationService()
                 for alert in alerts:
                     await notifier.send_system_alert(
-                        "metric_anomaly",
-                        f"Business {business_id}: {alert}",
-                        severity="critical"
+                        "metric_anomaly", f"Business {business_id}: {alert}", severity="critical"
                     )
 
             return {
@@ -58,9 +57,9 @@ async def monitor_business_metrics(self, business_id: str):
                     "daily_revenue": metrics.get("daily_revenue"),
                     "active_users": metrics.get("active_users_count"),
                     "churn_rate": metrics.get("churn_rate"),
-                    "bugs": metrics.get("bug_count")
+                    "bugs": metrics.get("bug_count"),
                 },
-                "alerts": alerts
+                "alerts": alerts,
             }
         else:
             return {"status": "failed", "error": result.error}
@@ -79,8 +78,7 @@ async def monitor_support_quality(self, business_id: str):
     try:
         agent = SupportAgent(UUID(business_id), {})
         result = await agent.execute_task(
-            "generate_support_report",
-            {"period": "daily", "format": "summary"}
+            "generate_support_report", {"period": "daily", "format": "summary"}
         )
 
         if result.success:
@@ -92,7 +90,9 @@ async def monitor_support_quality(self, business_id: str):
                 alerts.append("High ticket volume detected")
 
             # Check for poor resolution time
-            avg_resolution = report.get("metrics", {}).get("resolution_time", {}).get("avg_resolution_hours", 0)
+            avg_resolution = (
+                report.get("metrics", {}).get("resolution_time", {}).get("avg_resolution_hours", 0)
+            )
             if avg_resolution > 8:
                 alerts.append(f"Slow resolution time: {avg_resolution}h average")
 
@@ -105,16 +105,14 @@ async def monitor_support_quality(self, business_id: str):
                 notifier = NotificationService()
                 for alert in alerts:
                     await notifier.send_system_alert(
-                        "support_quality",
-                        f"Business {business_id}: {alert}",
-                        severity="high"
+                        "support_quality", f"Business {business_id}: {alert}", severity="high"
                     )
 
             return {
                 "status": "monitored",
                 "business_id": business_id,
                 "support_metrics": report.get("metrics", {}),
-                "alerts": alerts
+                "alerts": alerts,
             }
         else:
             return {"status": "failed", "error": result.error}
@@ -130,15 +128,12 @@ async def health_check():
 
     logger.info("Running system health check")
 
-    checks = {
-        "celery": True,
-        "redis": False,
-        "database": False
-    }
+    checks = {"celery": True, "redis": False, "database": False}
 
     # Check Redis
     try:
         import redis as redis_lib
+
         r = redis_lib.from_url("redis://localhost:6379/0")
         r.ping()
         checks["redis"] = True
@@ -148,6 +143,7 @@ async def health_check():
     # Check database
     try:
         from app.database import get_engine
+
         engine = get_engine()
         with engine.connect() as conn:
             conn.execute(engine.dialect.text("SELECT 1"))
@@ -160,5 +156,5 @@ async def health_check():
     return {
         "status": "healthy" if all_healthy else "degraded",
         "checks": checks,
-        "timestamp": __import__("datetime").datetime.utcnow().isoformat()
+        "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
     }

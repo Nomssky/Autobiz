@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 """Retrain embeddings script — updates the vector store with new knowledge."""
+import logging
 import os
 import sys
-import json
-import logging
-from datetime import datetime
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app"))
 
@@ -14,44 +12,54 @@ logger = logging.getLogger(__name__)
 
 def collect_business_knowledge(db_session):
     """Collect business data to embed in vector store."""
-    from app.models.business import Business
     from app.models.agent_task import AgentTask
+    from app.models.business import Business
     from sqlalchemy import select
 
     businesses = db_session.execute(select(Business)).scalars().all()
     documents = []
 
     for business in businesses:
-        documents.append({
-            "id": f"business-{business.id}",
-            "vector": None,  # Will be computed by embedding model
-            "payload": {
-                "type": "business",
-                "name": business.name,
-                "description": business.description,
-                "status": business.status,
-                "sector": business.metadata.get("industry", "general") if hasattr(business, 'metadata') else "general",
-            },
-        })
+        documents.append(
+            {
+                "id": f"business-{business.id}",
+                "vector": None,  # Will be computed by embedding model
+                "payload": {
+                    "type": "business",
+                    "name": business.name,
+                    "description": business.description,
+                    "status": business.status,
+                    "sector": (
+                        business.metadata.get("industry", "general")
+                        if hasattr(business, "metadata")
+                        else "general"
+                    ),
+                },
+            }
+        )
 
-        tasks = db_session.execute(
-            select(AgentTask).where(AgentTask.business_id == business.id)
-        ).scalars().all()
+        tasks = (
+            db_session.execute(select(AgentTask).where(AgentTask.business_id == business.id))
+            .scalars()
+            .all()
+        )
 
         for task in tasks:
             if task.output_data:
-                documents.append({
-                    "id": f"task-output-{task.id}",
-                    "vector": None,
-                    "payload": {
-                        "type": "task_output",
-                        "business_id": str(business.id),
-                        "role": task.role_name,
-                        "task_type": task.task_type,
-                        "status": task.status,
-                        "output_summary": str(task.output_data)[:500],
-                    },
-                })
+                documents.append(
+                    {
+                        "id": f"task-output-{task.id}",
+                        "vector": None,
+                        "payload": {
+                            "type": "task_output",
+                            "business_id": str(business.id),
+                            "role": task.role_name,
+                            "task_type": task.task_type,
+                            "status": task.status,
+                            "output_summary": str(task.output_data)[:500],
+                        },
+                    }
+                )
 
     logger.info(f"Collected {len(documents)} documents for embedding")
     return documents
@@ -69,7 +77,7 @@ def generate_mock_embeddings(documents: list, dimension: int = 1536) -> list:
         # Deterministic mock embedding based on document ID
         seed = hashlib.md5(doc["id"].encode()).hexdigest()
         vector = [
-            float(int(seed[i:i+2], 16) % 1000) / 1000
+            float(int(seed[i : i + 2], 16) % 1000) / 1000
             for i in range(0, min(len(seed), dimension * 4), 4)
         ]
         # Pad or truncate to exact dimension
@@ -82,7 +90,6 @@ def generate_mock_embeddings(documents: list, dimension: int = 1536) -> list:
 def main():
     """Main retraining pipeline."""
     from app.database import SessionLocal, get_engine
-    from app.config import settings
     from app.infrastructure.vector_store import VectorStore
 
     # Initialize DB

@@ -1,9 +1,9 @@
 """Build pipeline — orchestrates agent tasks for a new business."""
+
+from datetime import datetime, timedelta
 from typing import Dict, List
 from uuid import UUID
-from datetime import datetime, timedelta
 
-from app.models.business import Business
 from app.models.agent_task import AgentTask
 from app.models.approval_request import ApprovalRequest
 
@@ -104,8 +104,6 @@ def run_build_pipeline(
     """
     tasks_config = build_pipeline_tasks(business_id, idea, ceo_id)
     created_tasks = []
-
-    from app.models.agent_task import AgentTask
 
     for step_name, config in tasks_config.items():
         task = AgentTask(

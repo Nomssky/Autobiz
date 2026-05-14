@@ -1,19 +1,19 @@
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
-from contextlib import asynccontextmanager
 import logging
-
-from sqlalchemy import text
+from contextlib import asynccontextmanager
 
 from app.api.dependencies import get_engine
 from app.api.v1 import router as v1_router
 from app.auth.middleware import AuthMiddleware
 from app.config import settings
-from app.middleware.logging import RequestLoggingMiddleware
-from app.middleware.compression import GzipMiddleware
-from app.middleware.metrics import PrometheusMiddleware
 from app.middleware.audit import AuditMiddleware
+from app.middleware.compression import GzipMiddleware
+from app.middleware.logging import RequestLoggingMiddleware
+from app.middleware.metrics import PrometheusMiddleware
+from app.middleware.security import RateLimitMiddleware, WebhookAuthMiddleware
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, PlainTextResponse
+from sqlalchemy import text
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,8 +25,8 @@ def setup_sentry():
     if settings.SENTRY_DSN:
         try:
             import sentry_sdk
-            from sentry_sdk.integrations.fastapi import FastApiIntegration
             from sentry_sdk.integrations.celery import CeleryIntegration
+            from sentry_sdk.integrations.fastapi import FastApiIntegration
             from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 
             sentry_sdk.init(
@@ -52,10 +52,11 @@ async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle hook."""
     logger.info("Starting up AutoBiz Engine API...")
     try:
-        from sqlalchemy import inspect as sa_inspect
+
         engine = get_engine()
         if "sqlite" in str(engine.url):
             from app.models.base import Base
+
             Base.metadata.create_all(bind=engine)
             logger.info("SQLite tables created automatically")
     except Exception as e:
@@ -84,12 +85,8 @@ app.add_middleware(GzipMiddleware)
 app.add_middleware(AuthMiddleware)
 app.add_middleware(AuditMiddleware)
 
-# Rate limiting middleware
-from app.middleware.security import RateLimitMiddleware
 app.add_middleware(RateLimitMiddleware)
 
-# Webhook security middleware
-from app.middleware.security import WebhookAuthMiddleware
 app.add_middleware(WebhookAuthMiddleware)
 
 # ---- Prometheus metrics endpoint ----

@@ -1,13 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+import bcrypt as _bcrypt
+from app.api.dependencies import get_db_session
+from app.auth.jwt_handler import create_access_token
+from app.models.user import User
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from uuid import uuid4
-
-from app.auth.jwt_handler import create_access_token
-from app.api.dependencies import get_db_session
-from app.models.user import User
-import bcrypt as _bcrypt
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

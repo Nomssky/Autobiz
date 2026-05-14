@@ -1,19 +1,15 @@
 """Shared test fixtures for the AutoBiz Engine API test suite."""
-import pytest
-from uuid import uuid4
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.pool import StaticPool
 
+from uuid import uuid4
+
+import pytest
+from app.models.approval_request import ApprovalRequest
 from app.models.base import Base
 from app.models.business import Business
-from app.models.agent_task import AgentTask
-from app.models.approval_request import ApprovalRequest
 from app.models.metric import MetricSnapshot
-from app.models.deployment import Deployment
-from app.models.user_feedback import UserFeedback
-from app.models.agent_execution import AgentExecution
-
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 # Use SQLite in-memory for fast, isolated tests
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -128,5 +124,6 @@ def ceo_id():
 def ceo_headers(ceo_id):
     """Return auth headers with a valid JWT for the test CEO."""
     from app.auth.jwt_handler import create_access_token
+
     token = create_access_token({"sub": str(ceo_id), "roles": ["ceo"]})
     return {"Authorization": f"Bearer {token}"}

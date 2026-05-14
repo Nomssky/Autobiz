@@ -1,9 +1,10 @@
-from typing import Dict, Any, List, Optional
-from uuid import UUID
 import json
 import logging
 from datetime import datetime
-from app.agents.base_agent import BaseAgent, AgentResult
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from app.agents.base_agent import AgentResult, BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +19,7 @@ class SupportAgent(BaseAgent):
         return []
 
     async def execute_task(
-        self,
-        task_type: str,
-        input_data: Dict[str, Any],
-        context: Optional[Dict] = None
+        self, task_type: str, input_data: Dict[str, Any], context: Optional[Dict] = None
     ) -> AgentResult:
         if task_type == "process_ticket":
             return await self._process_ticket(input_data)
@@ -60,19 +58,29 @@ Return JSON with:
 - kb_articles: array of relevant article titles"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a customer support agent.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a customer support agent."
+            )
             output = json.loads(response)
             requires_escalation = output.get("requires_escalation", False) or category == "security"
 
             return AgentResult(
                 success=True,
-                output={**output, "ticket_id": ticket_id, "status": "resolved" if not requires_escalation else "escalated"},
+                output={
+                    **output,
+                    "ticket_id": ticket_id,
+                    "status": "resolved" if not requires_escalation else "escalated",
+                },
                 requires_approval=requires_escalation,
-                approval_proposal={
-                    "title": f"Escalate ticket #{ticket_id}",
-                    "description": subject,
-                    "priority": output.get("priority", "medium"),
-                } if requires_escalation else None,
+                approval_proposal=(
+                    {
+                        "title": f"Escalate ticket #{ticket_id}",
+                        "description": subject,
+                        "priority": output.get("priority", "medium"),
+                    }
+                    if requires_escalation
+                    else None
+                ),
                 tokens_used=getattr(self.llm, "last_token_usage", {}),
             )
         except Exception as e:
@@ -91,10 +99,15 @@ Return JSON with:
 - resolved: boolean"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are an automated support responder.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are an automated support responder."
+            )
             output = json.loads(response)
-            return AgentResult(success=True, output={**output, "ticket_id": params.get("ticket_id", ""), "auto_generated": True},
-                               requires_approval=False)
+            return AgentResult(
+                success=True,
+                output={**output, "ticket_id": params.get("ticket_id", ""), "auto_generated": True},
+                requires_approval=False,
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
@@ -120,10 +133,15 @@ Limit: {params.get('limit', 5)}
 Return JSON with results array of {{title, summary, relevance_score, category}}"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a knowledge base search system.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a knowledge base search system."
+            )
             output = json.loads(response)
-            return AgentResult(success=True, output={"query": query, "results": output.get("results", [])},
-                               requires_approval=False)
+            return AgentResult(
+                success=True,
+                output={"query": query, "results": output.get("results", [])},
+                requires_approval=False,
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
@@ -140,10 +158,15 @@ Return JSON with:
 - urgency: low/medium/high"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a sentiment analysis AI.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a sentiment analysis AI."
+            )
             output = json.loads(response)
-            return AgentResult(success=True, output={**output, "ticket_id": params.get("ticket_id", "")},
-                               requires_approval=False)
+            return AgentResult(
+                success=True,
+                output={**output, "ticket_id": params.get("ticket_id", "")},
+                requires_approval=False,
+            )
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
@@ -158,7 +181,9 @@ Return JSON with:
 - recommendations: array of improvement suggestions"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a support analytics analyst.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a support analytics analyst."
+            )
             output = json.loads(response)
             return AgentResult(success=True, output=output, requires_approval=False)
         except Exception as e:

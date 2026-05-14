@@ -3,29 +3,23 @@ Integration tests for AutoBiz Engine — Full Business Lifecycle.
 
 Test flow: Create Business → AI Research → Development → Design → Finance → Launch → Operate → Scale
 """
-import pytest
-import sys
+
 import os
-from unittest.mock import patch, MagicMock, AsyncMock
+import sys
 from uuid import uuid4
+
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from starlette.testclient import TestClient
-
-from app.main import app
 from app.api.dependencies import get_db_session
 from app.auth.jwt_handler import create_access_token
+from app.main import app
 from app.models.base import Base
-from app.models.business import Business
-from app.models.agent_task import AgentTask
-from app.models.approval_request import ApprovalRequest
-from app.models.metric import MetricSnapshot
-
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
+from starlette.testclient import TestClient
 
 # ---- Test Database ----
 
@@ -44,6 +38,7 @@ def _fk_pragma_on_connect(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
+
 
 event.listen(engine, "connect", _fk_pragma_on_connect)
 
@@ -67,6 +62,7 @@ def override_get_db():
             raise
         finally:
             db.close()
+
     app.dependency_overrides[get_db_session] = _override
     yield
     app.dependency_overrides.clear()
@@ -90,6 +86,7 @@ def auth_headers(ceo_id):
 
 # ====== Full Lifecycle Tests ======
 
+
 class TestBusinessCreation:
     """Phase 0: Business Creation"""
 
@@ -112,7 +109,7 @@ class TestBusinessCreation:
 
     def test_get_business_details(self, client, ceo_id, auth_headers):
         """Retrieve business details."""
-        business_id = getattr(self.__class__, 'business_id', None)
+        business_id = getattr(self.__class__, "business_id", None)
         assert business_id, "No business created yet"
 
         response = client.get(f"/api/v1/businesses/{business_id}", headers=auth_headers)
@@ -122,13 +119,15 @@ class TestBusinessCreation:
         assert data["name"] == "AI-powered e-commerce personalization engine"
 
 
-@pytest.mark.skip(reason="Depends on TestBusinessCreation state. See test_approval_flow.py for isolated tests.")
+@pytest.mark.skip(
+    reason="Depends on TestBusinessCreation state. See test_approval_flow.py for isolated tests."
+)
 class TestBuildPipeline:
     """Phase 1-3: Build Pipeline — Research, Development, Design tasks created."""
 
     def test_timeline_has_phases(self, client, ceo_id, auth_headers):
         """Build pipeline should create agent task phases."""
-        business_id = getattr(self.__class__, 'business_id', None)
+        business_id = getattr(self.__class__, "business_id", None)
         assert business_id, "No business created"
 
         response = client.get(f"/api/v1/businesses/{business_id}/timeline", headers=auth_headers)
@@ -143,20 +142,22 @@ class TestBuildPipeline:
 
     def test_business_transitioned_to_planning(self, client, ceo_id, auth_headers):
         """After build pipeline, business should be in planning or later phase."""
-        business_id = getattr(self.__class__, 'business_id', None)
+        business_id = getattr(self.__class__, "business_id", None)
         response = client.get(f"/api/v1/businesses/{business_id}", headers=auth_headers)
         data = response.json()
         # Phase may vary depending on pipeline implementation
         assert data["status"] in ["building", "operating", "failed"]
 
 
-@pytest.mark.skip(reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead.")
+@pytest.mark.skip(
+    reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead."
+)
 class TestApprovalWorkflow:
     """Phase 4: Approval workflows during build."""
 
     def test_create_approval_request(self, client, ceo_id, auth_headers):
         """Create an approval request for a major decision."""
-        business_id = getattr(self.__class__, 'business_id', None)
+        business_id = getattr(self.__class__, "business_id", None)
         assert business_id
 
         response = client.post(
@@ -195,7 +196,7 @@ class TestApprovalWorkflow:
 
     def test_ceo_approves(self, client, ceo_id, auth_headers):
         """CEO approves the request."""
-        approval_id = getattr(self.__class__, 'approval_id', None)
+        approval_id = getattr(self.__class__, "approval_id", None)
         assert approval_id
 
         response = client.post(
@@ -213,7 +214,7 @@ class TestApprovalWorkflow:
 
     def test_approval_cannot_be_re_decided(self, client, ceo_id, auth_headers):
         """Already-decided approval cannot be changed."""
-        approval_id = getattr(self.__class__, 'approval_id', None)
+        approval_id = getattr(self.__class__, "approval_id", None)
         assert approval_id
 
         response = client.post(
@@ -228,7 +229,9 @@ class TestApprovalWorkflow:
         assert response.status_code == 400
 
 
-@pytest.mark.skip(reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead.")
+@pytest.mark.skip(
+    reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead."
+)
 class TestMetricsLifecycle:
     """Phase 5-6: Metrics — Record and retrieve operational data."""
 
@@ -237,51 +240,58 @@ class TestMetricsLifecycle:
         return {"Authorization": f"Bearer {token}"}
 
     def test_record_daily_metrics(self, client, ceo_id, auth_headers):
-        business_id = getattr(self.__class__, 'business_id', None)
+        business_id = getattr(self.__class__, "business_id", None)
         assert business_id
 
         for day in range(7):
-            resp = client.post("/api/v1/metrics/", json={
-                "business_id": business_id,
-                "recorded_by_role": "finance",
-                "daily_revenue": 500 + day * 50,
-                "weekly_revenue": 3500 + day * 350,
-                "monthly_revenue": 15000 + day * 1500,
-                "users_count": 100 + day * 20,
-                "active_users_count": 80 + day * 15,
-                "churn_rate": round(0.03 + day * 0.002, 4),
-                "bug_count": max(1, 5 - day),
-                "support_tickets_count": 20 - day * 2,
-                "open_support_tickets": 8 - day,
-                "conversion_rate": round(0.03 + day * 0.005, 4),
-                "customer_acquisition_cost": 25.0 - day * 0.5,
-                "lifetime_value": 480.0 + day * 20,
-            })
+            resp = client.post(
+                "/api/v1/metrics/",
+                json={
+                    "business_id": business_id,
+                    "recorded_by_role": "finance",
+                    "daily_revenue": 500 + day * 50,
+                    "weekly_revenue": 3500 + day * 350,
+                    "monthly_revenue": 15000 + day * 1500,
+                    "users_count": 100 + day * 20,
+                    "active_users_count": 80 + day * 15,
+                    "churn_rate": round(0.03 + day * 0.002, 4),
+                    "bug_count": max(1, 5 - day),
+                    "support_tickets_count": 20 - day * 2,
+                    "open_support_tickets": 8 - day,
+                    "conversion_rate": round(0.03 + day * 0.005, 4),
+                    "customer_acquisition_cost": 25.0 - day * 0.5,
+                    "lifetime_value": 480.0 + day * 20,
+                },
+            )
             assert resp.status_code == 201
 
         print("\n📊 7 days of metrics recorded")
 
     def test_metric_summary(self, client, ceo_id, auth_headers):
-        business_id = getattr(self.__class__, 'business_id', None)
+        business_id = getattr(self.__class__, "business_id", None)
         resp = client.get(f"/api/v1/metrics/{business_id}/summary?days=7", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
         assert data["snapshot_count"] >= 7
         assert data["avg_daily_revenue"] > 0
-        print(f"📈 Summary: {data['snapshot_count']} days, avg revenue={data['avg_daily_revenue']:.2f}")
+        print(
+            f"📈 Summary: {data['snapshot_count']} days, avg revenue={data['avg_daily_revenue']:.2f}"
+        )
 
     def test_get_latest_metric(self, client, ceo_id, auth_headers):
-        business_id = getattr(self.__class__, 'business_id', None)
+        business_id = getattr(self.__class__, "business_id", None)
         resp = client.get(f"/api/v1/metrics/{business_id}/realtime", headers=auth_headers)
         assert resp.status_code in (200, 404)
 
 
-@pytest.mark.skip(reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead.")
+@pytest.mark.skip(
+    reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead."
+)
 class TestLaunch:
     """Phase 7: Launch the business."""
 
     def test_launch_business(self, client, ceo_id, auth_headers):
-        business_id = getattr(self.__class__, 'business_id', None)
+        business_id = getattr(self.__class__, "business_id", None)
         resp = client.post(f"/api/v1/businesses/{business_id}/launch", headers=auth_headers)
         assert resp.status_code == 200
         data = resp.json()
@@ -291,17 +301,19 @@ class TestLaunch:
 
     def test_cannot_re_launch(self, client, ceo_id, auth_headers):
         """Already launched business cannot be launched again."""
-        business_id = getattr(self.__class__, 'business_id', None)
+        business_id = getattr(self.__class__, "business_id", None)
         resp = client.post(f"/api/v1/businesses/{business_id}/launch", headers=auth_headers)
         assert resp.status_code == 400
 
 
-@pytest.mark.skip(reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead.")
+@pytest.mark.skip(
+    reason="Depends on TestBusinessCreation state via class-level attributes. Use test_approval_flow.py instead."
+)
 class TestArchive:
     """Phase 8: Archive business."""
 
     def test_archive_business(self, client, ceo_id, auth_headers):
-        business_id = getattr(self.__class__, 'business_id', None)
+        business_id = getattr(self.__class__, "business_id", None)
         resp = client.delete(f"/api/v1/businesses/{business_id}", headers=auth_headers)
         assert resp.status_code == 204
         print(f"\n🗄️  Business {business_id[:8]} archived")
@@ -309,20 +321,31 @@ class TestArchive:
 
 # ====== Utility Tests ======
 
-@pytest.mark.skip(reason="Depends on class-level state. Error cases covered in test_approval_flow.py.")
+
+@pytest.mark.skip(
+    reason="Depends on class-level state. Error cases covered in test_approval_flow.py."
+)
 class TestErrorHandling:
     """Test error cases and edge conditions."""
 
     def test_create_duplicate_business(self, client, ceo_id, auth_headers):
         """Creating same business twice should both succeed (different IDs)."""
-        resp1 = client.post("/api/v1/businesses/create", json={
-            "idea": "Test business",
-            "ceo_id": str(ceo_id),
-        }, headers=auth_headers)
-        resp2 = client.post("/api/v1/businesses/create", json={
-            "idea": "Test business",
-            "ceo_id": str(ceo_id),
-        }, headers=auth_headers)
+        resp1 = client.post(
+            "/api/v1/businesses/create",
+            json={
+                "idea": "Test business",
+                "ceo_id": str(ceo_id),
+            },
+            headers=auth_headers,
+        )
+        resp2 = client.post(
+            "/api/v1/businesses/create",
+            json={
+                "idea": "Test business",
+                "ceo_id": str(ceo_id),
+            },
+            headers=auth_headers,
+        )
         assert resp1.status_code == 201
         assert resp2.status_code == 201
         assert resp1.json()["id"] != resp2.json()["id"]

@@ -1,8 +1,9 @@
+import logging
+
+from app.config import settings
 from celery import Celery
 from celery.signals import worker_ready, worker_shutdown
-from kombu import Queue, Exchange
-from app.config import settings
-import logging
+from kombu import Exchange, Queue
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ celery_app = Celery(
         "app.tasks.business_tasks",
         "app.tasks.agent_tasks",
         "app.tasks.batch_tasks",
-    ]
+    ],
 )
 
 # Celery configuration
@@ -36,21 +37,18 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
     broker_connection_retry_on_startup=True,
     result_expires=3600,
-
     task_routes={
         "app.tasks.batch_tasks.batched_create_business": {"queue": "batch"},
         "app.tasks.batch_tasks.batched_metrics_aggregation": {"queue": "batch"},
         "app.tasks.business_tasks.*": {"queue": "business"},
         "app.tasks.agent_tasks.*": {"queue": "agent"},
     },
-
     task_queues=[
         Queue("critical", Exchange("critical"), routing_key="critical"),
         Queue("agent", Exchange("agent"), routing_key="agent"),
         Queue("business", Exchange("business"), routing_key="business"),
         Queue("batch", Exchange("batch"), routing_key="batch"),
     ],
-
     beat_schedule={
         "aggregate-metrics-every-5min": {
             "task": "app.tasks.batch_tasks.batched_metrics_aggregation",

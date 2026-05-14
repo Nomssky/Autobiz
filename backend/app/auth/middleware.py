@@ -1,13 +1,10 @@
 """Auth middleware for JWT validation on all API routes."""
-from typing import Optional
 
+from app.auth.jwt_handler import verify_token
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from starlette.status import HTTP_401_UNAUTHORIZED
-
-from app.auth.jwt_handler import verify_token
-
 
 PUBLIC_PATHS = {"/api/v1/auth/login", "/api/v1/auth/register", "/api/v1/webhooks"}
 
@@ -23,7 +20,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         auth_header = request.headers.get("Authorization", "")
-        token = auth_header.removeprefix("Bearer ").strip() if auth_header.startswith("Bearer ") else auth_header.strip()
+        token = (
+            auth_header.removeprefix("Bearer ").strip()
+            if auth_header.startswith("Bearer ")
+            else auth_header.strip()
+        )
 
         if not token:
             return JSONResponse(

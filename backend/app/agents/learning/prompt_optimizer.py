@@ -1,8 +1,9 @@
 """Prompt optimizer — auto-refines prompts based on success rate tracking."""
+
+import logging
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from uuid import UUID
-from datetime import datetime, timedelta
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +21,8 @@ class PromptOptimizer:
         days: int = 30,
     ) -> Dict:
         """Get execution statistics for optimization insights."""
-        from sqlalchemy import select, desc
         from app.models.agent_execution import AgentExecution
-        from app.models.agent_task import AgentTask
+        from sqlalchemy import desc, select
 
         cutoff = datetime.utcnow() - timedelta(days=days)
 
@@ -56,31 +56,21 @@ class PromptOptimizer:
             "success_count": success_count,
             "failure_count": total - success_count,
             "success_rate": round(success_count / total, 4),
-            "avg_cost_usd": round(
-                sum(e.cost_usd or 0 for e in executions) / total, 4
-            ),
-            "avg_duration_ms": round(
-                sum(e.duration_ms or 0 for e in executions) / total, 1
-            ),
-            "avg_input_tokens": round(
-                sum(e.input_tokens or 0 for e in executions) / total, 1
-            ),
-            "avg_output_tokens": round(
-                sum(e.output_tokens or 0 for e in executions) / total, 1
-            ),
+            "avg_cost_usd": round(sum(e.cost_usd or 0 for e in executions) / total, 4),
+            "avg_duration_ms": round(sum(e.duration_ms or 0 for e in executions) / total, 1),
+            "avg_input_tokens": round(sum(e.input_tokens or 0 for e in executions) / total, 1),
+            "avg_output_tokens": round(sum(e.output_tokens or 0 for e in executions) / total, 1),
         }
 
-    def analyze_failures(
-        self, business_id: UUID, role_name: Optional[str] = None
-    ) -> List[Dict]:
+    def analyze_failures(self, business_id: UUID, role_name: Optional[str] = None) -> List[Dict]:
         """Analyze failed executions to identify improvement patterns."""
-        from sqlalchemy import select, desc
         from app.models.agent_execution import AgentExecution
+        from sqlalchemy import desc, select
 
         query = (
             select(AgentExecution)
             .where(AgentExecution.business_id == business_id)
-            .where(AgentExecution.success == False)
+            .where(AgentExecution.success.is_(False))
             .order_by(desc(AgentExecution.created_at))
             .limit(50)
         )
@@ -101,10 +91,7 @@ class PromptOptimizer:
             if len(error_patterns[key]["examples"]) < 3:
                 error_patterns[key]["examples"].append(error[:200])
 
-        return [
-            {"pattern": pattern, **stats}
-            for pattern, stats in error_patterns.items()
-        ]
+        return [{"pattern": pattern, **stats} for pattern, stats in error_patterns.items()]
 
     def generate_optimized_prompt(
         self,
@@ -147,8 +134,7 @@ class PromptOptimizer:
         avg_output = execution_stats.get("avg_output_tokens", 0)
         if avg_output > 2000:
             optimizations.append(
-                f"[LENGTH_LIMIT]: Keep response under 1000 tokens. "
-                f"Summarize key findings only."
+                "[LENGTH_LIMIT]: Keep response under 1000 tokens. " "Summarize key findings only."
             )
 
         if optimizations:

@@ -4,8 +4,9 @@ Revision ID: add_users_table
 Revises: multi_tenancy_v1
 Create Date: 2026-05-13
 """
-from alembic import op
+
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects.postgresql import UUID
 
 revision = "add_users_table"

@@ -1,11 +1,12 @@
 """Tests for business creation and management endpoints."""
-import pytest
-from uuid import uuid4
-from starlette.testclient import TestClient
 
-from app.main import app
+from uuid import uuid4
+
+import pytest
 from app.api.dependencies import get_db_session
 from app.auth.jwt_handler import create_access_token
+from app.main import app
+from starlette.testclient import TestClient
 
 
 class TestBusinessEndpoints:

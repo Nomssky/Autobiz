@@ -1,6 +1,15 @@
+from app.api.v1 import (
+    api_keys,
+    approvals,
+    auth,
+    billing,
+    businesses,
+    learning,
+    metrics,
+    vectors,
+    webhooks,
+)
 from fastapi import APIRouter
-
-from app.api.v1 import auth, businesses, approvals, metrics, webhooks, vectors, learning, billing, api_keys
 
 router = APIRouter()
 

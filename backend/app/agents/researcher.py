@@ -1,9 +1,10 @@
-from typing import Dict, Any, List, Optional
-from uuid import UUID
 import json
 import logging
-from app.agents.base_agent import BaseAgent, AgentResult
-from app.agents.schemas.researcher_output import ResearcherOutput, Competitor
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from app.agents.base_agent import AgentResult, BaseAgent
+from app.agents.schemas.researcher_output import Competitor, ResearcherOutput
 
 logger = logging.getLogger(__name__)
 
@@ -38,10 +39,7 @@ class ResearcherAgent(BaseAgent):
         return []
 
     async def execute_task(
-        self,
-        task_type: str,
-        input_data: Dict[str, Any],
-        context: Optional[Dict] = None
+        self, task_type: str, input_data: Dict[str, Any], context: Optional[Dict] = None
     ) -> AgentResult:
         if task_type == "validate_business_idea":
             return await self._validate_business_idea(input_data)
@@ -52,11 +50,7 @@ class ResearcherAgent(BaseAgent):
         elif task_type == "trend_analysis":
             return await self._analyze_trends(input_data)
         else:
-            return AgentResult(
-                success=False,
-                output=None,
-                error=f"Unknown task type: {task_type}"
-            )
+            return AgentResult(success=False, output=None, error=f"Unknown task type: {task_type}")
 
     async def _validate_business_idea(self, data: Dict[str, Any]) -> AgentResult:
         idea = data.get("idea", "")
@@ -75,11 +69,15 @@ class ResearcherAgent(BaseAgent):
                 success=True,
                 output=validated.model_dump(),
                 requires_approval=validated.opportunity_score < 40,
-                approval_proposal={
-                    "title": f"Low opportunity score: {validated.opportunity_score}/100",
-                    "description": f"Business idea '{validated.business_name}' scored low on opportunity. Consider pivoting.",
-                    "impact": f"Market size: ${validated.market_size_usd:,.0f}",
-                } if validated.opportunity_score < 40 else None,
+                approval_proposal=(
+                    {
+                        "title": f"Low opportunity score: {validated.opportunity_score}/100",
+                        "description": f"Business idea '{validated.business_name}' scored low on opportunity. Consider pivoting.",
+                        "impact": f"Market size: ${validated.market_size_usd:,.0f}",
+                    }
+                    if validated.opportunity_score < 40
+                    else None
+                ),
                 tokens_used=tokens,
             )
         except Exception as e:
@@ -99,7 +97,9 @@ Return JSON with:
 - recommended_positioning: recommended market position"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a competitive intelligence analyst.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a competitive intelligence analyst."
+            )
             output = json.loads(response)
             competitors = [Competitor(**c) for c in output.get("competitors", [])]
 
@@ -126,7 +126,9 @@ Return JSON with:
 - declining_trends: array of {{trend, impact, timeline}}"""
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a market intelligence analyst.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a market intelligence analyst."
+            )
             output = json.loads(response)
             return AgentResult(
                 success=True,

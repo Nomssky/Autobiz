@@ -1,6 +1,7 @@
-from sqlalchemy import Column, String, Text, DateTime, JSON
+from sqlalchemy import JSON, Column, DateTime, String
 from sqlalchemy.sql import func
-from .base import BaseModel, GUID
+
+from .base import GUID, BaseModel
 
 
 class AuditLog(BaseModel):

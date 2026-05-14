@@ -1,19 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, desc
-from sqlalchemy.orm import Session
+from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime
 
 from app.api.dependencies import get_db_session, require_ceo
 from app.models.approval_request import ApprovalRequest
 from app.schemas import (
-    ApprovalRequestCreate,
-    ApprovalRequestUpdate,
-    ApprovalRequestResponse,
-    ApprovalDecisionRequest,
     ApprovalDecision,
+    ApprovalDecisionRequest,
+    ApprovalRequestCreate,
+    ApprovalRequestResponse,
+    ApprovalRequestUpdate,
 )
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import desc, select
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/approvals", tags=["approvals"])
 
@@ -79,12 +79,12 @@ def get_approval(
     _: UUID = Depends(require_ceo),
 ):
     """Get details of a specific approval request."""
-    result = db.execute(
-        select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
-    )
+    result = db.execute(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))
     approval = result.scalar_one_or_none()
     if not approval:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval request not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Approval request not found"
+        )
     return ApprovalRequestResponse.model_validate(approval)
 
 
@@ -127,12 +127,12 @@ def decide_approval(
     ceo_id: UUID = Depends(require_ceo),
 ):
     """Submit CEO decision (approve/reject) on an approval request."""
-    result = db.execute(
-        select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
-    )
+    result = db.execute(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))
     approval = result.scalar_one_or_none()
     if not approval:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval request not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Approval request not found"
+        )
 
     if approval.status != "pending":
         raise HTTPException(
@@ -168,12 +168,12 @@ def update_approval(
     _: UUID = Depends(require_ceo),
 ):
     """Update an approval request."""
-    result = db.execute(
-        select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
-    )
+    result = db.execute(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))
     approval = result.scalar_one_or_none()
     if not approval:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval request not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Approval request not found"
+        )
 
     update_data = updates.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -197,12 +197,12 @@ def cancel_approval(
     _: UUID = Depends(require_ceo),
 ):
     """Cancel/expire an approval request."""
-    result = db.execute(
-        select(ApprovalRequest).where(ApprovalRequest.id == approval_id)
-    )
+    result = db.execute(select(ApprovalRequest).where(ApprovalRequest.id == approval_id))
     approval = result.scalar_one_or_none()
     if not approval:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Approval request not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Approval request not found"
+        )
 
     if approval.status != "pending":
         raise HTTPException(

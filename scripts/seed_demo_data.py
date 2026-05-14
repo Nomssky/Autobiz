@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Seed demo data into AutoBiz Engine for staging/testing."""
-import sys
 import os
+import sys
 from uuid import uuid4
-from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../backend")))
 
@@ -12,10 +11,10 @@ os.environ.setdefault("DATABASE_URL", "postgresql://user:password@localhost/auto
 
 def main():
     from app.database import SessionLocal
-    from app.models.business import Business
     from app.models.agent_task import AgentTask
-    from app.models.metric import MetricSnapshot
     from app.models.approval_request import ApprovalRequest
+    from app.models.business import Business
+    from app.models.metric import MetricSnapshot
 
     db = SessionLocal()
     try:
@@ -35,7 +34,13 @@ def main():
             task = AgentTask(
                 business_id=biz.id,
                 role_name=["researcher", "developer", "designer", "marketer", "finance"][i],
-                task_type=["market_research", "application_generation", "brand_identity", "marketing_strategy", "financial_modeling"][i],
+                task_type=[
+                    "market_research",
+                    "application_generation",
+                    "brand_identity",
+                    "marketing_strategy",
+                    "financial_modeling",
+                ][i],
                 status="completed",
                 priority=5 - i,
             )
@@ -65,9 +70,9 @@ def main():
         db.commit()
         print(f"Seeded demo business: {biz.id}")
         print(f"  Name: {biz.name}")
-        print(f"  Tasks: 5 created")
-        print(f"  Metrics: 30 days")
-        print(f"  Approvals: 1 pending")
+        print("  Tasks: 5 created")
+        print("  Metrics: 30 days")
+        print("  Approvals: 1 pending")
 
     finally:
         db.close()

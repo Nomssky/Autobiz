@@ -1,5 +1,6 @@
 """CrewAI agent configurations with tool assignments."""
-from typing import Dict, Any, List
+
+from typing import Any, Dict
 from uuid import UUID
 
 

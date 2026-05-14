@@ -1,18 +1,21 @@
-import pytest
-import sys
 import os
-from unittest.mock import Mock, AsyncMock, patch
+import sys
+from unittest.mock import Mock, patch
 from uuid import uuid4
+
+import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from app.orchestrator.phase_manager import PhaseManager, BusinessPhase
+from app.orchestrator.phase_manager import BusinessPhase, PhaseManager
 
 
 @pytest.fixture
 def phase_manager():
     """Create a PhaseManager instance with mocked database"""
-    with patch("app.orchestrator.phase_manager.get_db_session"),          patch("app.orchestrator.phase_manager.approval_gateway"),          patch("app.orchestrator.phase_manager.NotificationService"):
+    with patch("app.orchestrator.phase_manager.get_db_session"), patch(
+        "app.orchestrator.phase_manager.approval_gateway"
+    ), patch("app.orchestrator.phase_manager.NotificationService"):
         pm = PhaseManager(uuid4())
         pm.agents = {}
         pm.notifier = Mock()

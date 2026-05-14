@@ -1,9 +1,11 @@
-from sqlalchemy import Column, String, Integer, DateTime, Numeric, ForeignKey
-from .base import BaseModel, GUID, JSONB
+from sqlalchemy import Column, ForeignKey, Integer, Numeric, String
+
+from .base import GUID, JSONB, BaseModel
+
 
 class MetricSnapshot(BaseModel):
     __tablename__ = "metrics_snapshots"
-    
+
     business_id = Column(GUID(), ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
     recorded_by_role = Column(String(50), nullable=False)
     daily_revenue = Column(Numeric(10, 2), nullable=True)

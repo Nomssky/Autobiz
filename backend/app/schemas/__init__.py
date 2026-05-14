@@ -1,8 +1,9 @@
-from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
-from uuid import UUID
 from datetime import datetime
 from enum import Enum
+from typing import List, Optional
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict
 
 
 class BusinessBase(BaseModel):
@@ -12,7 +13,6 @@ class BusinessBase(BaseModel):
     status: Optional[str] = "building"
     current_phase: Optional[str] = "initialization"
     metadata: Optional[dict] = {}
-
 
 
 class BusinessCreate(BusinessBase):

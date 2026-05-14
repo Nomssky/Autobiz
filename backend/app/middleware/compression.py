@@ -2,8 +2,8 @@
 Response Compression Middleware
 Adds Gzip compression to API responses for reduced bandwidth usage.
 """
+
 import gzip
-from io import BytesIO
 from typing import Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -42,9 +42,14 @@ class GzipMiddleware(BaseHTTPMiddleware):
         # Check content type
         content_type = response.headers.get("Content-Type", "")
         binary_types = [
-            "image/", "video/", "audio/", "font/",
-            "application/octet-stream", "application/pdf",
-            "application/zip", "application/gzip",
+            "image/",
+            "video/",
+            "audio/",
+            "font/",
+            "application/octet-stream",
+            "application/pdf",
+            "application/zip",
+            "application/gzip",
         ]
         if any(bt in content_type for bt in binary_types):
             return response
@@ -100,8 +105,8 @@ class RequestResponseLogger(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        import time
         import logging
+        import time
 
         logger = logging.getLogger("api.requests")
 
@@ -136,4 +141,5 @@ class RequestResponseLogger(BaseHTTPMiddleware):
 
     def _get_request_id(self, request: Request) -> str:
         import uuid
+
         return request.headers.get("X-Request-Id", str(uuid.uuid4()))

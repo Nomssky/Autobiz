@@ -1,11 +1,12 @@
 """Tests for metrics endpoints."""
-import pytest
-from uuid import uuid4
-from starlette.testclient import TestClient
 
-from app.main import app
+from uuid import uuid4
+
+import pytest
 from app.api.dependencies import get_db_session
 from app.auth.jwt_handler import create_access_token
+from app.main import app
+from starlette.testclient import TestClient
 
 
 class TestMetricsEndpoints:
@@ -26,10 +27,16 @@ class TestMetricsEndpoints:
 
     def _create_business(self, db_session, ceo_id):
         from app.models.business import Business
+
         biz = Business(
-            id=uuid4(), name="TestBiz", description="Test",
-            ceo_id=ceo_id, status="building", current_phase="initialization",
-            business_metadata={}, extra_metadata={},
+            id=uuid4(),
+            name="TestBiz",
+            description="Test",
+            ceo_id=ceo_id,
+            status="building",
+            current_phase="initialization",
+            business_metadata={},
+            extra_metadata={},
         )
         db_session.add(biz)
         db_session.flush()
@@ -109,4 +116,5 @@ class TestMetricsEndpoints:
 
 if __name__ == "__main__":
     import pytest
+
     pytest.main([__file__, "-v"])

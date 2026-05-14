@@ -1,13 +1,12 @@
-from typing import Dict, Any, Optional
-from uuid import UUID, uuid4
-from datetime import datetime, timedelta
-import json
 import logging
-from sqlalchemy.orm import Session
-from app.database import SessionLocal
-from app.models import ApprovalRequest, Business, AgentTask
+from datetime import datetime, timedelta
+from typing import Any, Dict, Optional
+from uuid import UUID, uuid4
+
 from app.approval.notifier import ApprovalNotifier
-from app.config import settings
+from app.database import SessionLocal
+from app.models import AgentTask, ApprovalRequest, Business
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -22,22 +21,15 @@ class ApprovalGateway:
         return SessionLocal()
 
     async def create_approval_request(
-        self,
-        business_id: UUID,
-        task_id: UUID,
-        proposal: Dict[str, Any],
-        urgency: str = "normal"
+        self, business_id: UUID, task_id: UUID, proposal: Dict[str, Any], urgency: str = "normal"
     ) -> UUID:
         """Create a new approval request"""
         db = self.get_db()
         try:
             # Calculate expiry based on urgency
-            expiry_hours = {
-                "critical": 4,
-                "high": 12,
-                "normal": 48,
-                "low": 168  # 1 week
-            }.get(urgency, 48)
+            expiry_hours = {"critical": 4, "high": 12, "normal": 48, "low": 168}.get(  # 1 week
+                urgency, 48
+            )
 
             approval = ApprovalRequest(
                 id=uuid4(),
@@ -49,7 +41,7 @@ class ApprovalGateway:
                 impact_analysis=proposal.get("impact_analysis", {}),
                 urgency=urgency,
                 status="pending",
-                expires_at=datetime.utcnow() + timedelta(hours=expiry_hours)
+                expires_at=datetime.utcnow() + timedelta(hours=expiry_hours),
             )
 
             db.add(approval)
@@ -80,7 +72,7 @@ class ApprovalGateway:
         approval_id: UUID,
         ceo_id: UUID,
         decision: str,  # "approve", "reject"
-        comments: Optional[str] = None
+        comments: Optional[str] = None,
     ) -> bool:
         """Process CEO's decision on approval request"""
         db = self.get_db()
@@ -122,26 +114,18 @@ class ApprovalGateway:
         finally:
             db.close()
 
-    async def get_pending_approvals(
-        self,
-        ceo_id: UUID,
-        limit: int = 50
-    ) -> list[Dict[str, Any]]:
+    async def get_pending_approvals(self, ceo_id: UUID, limit: int = 50) -> list[Dict[str, Any]]:
         """Get all pending approval requests for a CEO"""
         db = self.get_db()
         try:
-            from sqlalchemy import select
-            from sqlalchemy.orm import selectinload
 
-            query = db.query(ApprovalRequest).join(
-                Business, ApprovalRequest.business_id == Business.id
-            ).filter(
-                Business.ceo_id == ceo_id,
-                ApprovalRequest.status == "pending"
-            ).order_by(
-                ApprovalRequest.urgency.desc(),
-                ApprovalRequest.created_at.asc()
-            ).limit(limit)
+            query = (
+                db.query(ApprovalRequest)
+                .join(Business, ApprovalRequest.business_id == Business.id)
+                .filter(Business.ceo_id == ceo_id, ApprovalRequest.status == "pending")
+                .order_by(ApprovalRequest.urgency.desc(), ApprovalRequest.created_at.asc())
+                .limit(limit)
+            )
 
             approvals = query.all()
 
@@ -154,7 +138,7 @@ class ApprovalGateway:
                     "proposed_changes": a.proposed_changes,
                     "urgency": a.urgency,
                     "expires_at": a.expires_at.isoformat(),
-                    "created_at": a.created_at.isoformat()
+                    "created_at": a.created_at.isoformat(),
                 }
                 for a in approvals
             ]
@@ -168,12 +152,16 @@ class ApprovalGateway:
             from app.models import AgentTask
 
             # Find tasks that can be auto-approved
-            tasks = db.query(AgentTask).filter(
-                AgentTask.business_id == business_id,
-                AgentTask.requires_approval == True,
-                AgentTask.approval_request_id.is_(None),
-                AgentTask.status == "completed"
-            ).all()
+            tasks = (
+                db.query(AgentTask)
+                .filter(
+                    AgentTask.business_id == business_id,
+                    AgentTask.requires_approval.is_(True),
+                    AgentTask.approval_request_id.is_(None),
+                    AgentTask.status == "completed",
+                )
+                .all()
+            )
 
             for task in tasks:
                 # Check if this task qualifies for auto-approval
@@ -186,7 +174,7 @@ class ApprovalGateway:
                         title=f"Auto-approved: {task.task_type}",
                         proposed_changes=task.output_data or {},
                         status="approved",
-                        decided_at=datetime.utcnow()
+                        decided_at=datetime.utcnow(),
                     )
                     db.add(approval)
                     task.approved_by_ceo_at = datetime.utcnow()
@@ -205,7 +193,7 @@ class ApprovalGateway:
             "security_patch",
             "bug_fix_critical",
             "typo_fix",
-            "documentation_update"
+            "documentation_update",
         ]
 
         if task.task_type in auto_approve_types:

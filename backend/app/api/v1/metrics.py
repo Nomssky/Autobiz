@@ -1,18 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy import select, desc, func
-from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime, timedelta
 
 from app.api.dependencies import get_db_session, require_ceo
-from app.models.metric import MetricSnapshot
 from app.models.business import Business
-from app.schemas import (
-    MetricSnapshotCreate,
-    MetricSnapshotResponse,
-    RealtimeMetricsResponse,
-)
+from app.models.metric import MetricSnapshot
+from app.schemas import MetricSnapshotCreate, MetricSnapshotResponse, RealtimeMetricsResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import desc, func, select
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])
 
@@ -55,12 +51,12 @@ def get_metric(
     _: UUID = Depends(require_ceo),
 ):
     """Get details of a specific metric snapshot."""
-    result = db.execute(
-        select(MetricSnapshot).where(MetricSnapshot.id == metric_id)
-    )
+    result = db.execute(select(MetricSnapshot).where(MetricSnapshot.id == metric_id))
     metric = result.scalar_one_or_none()
     if not metric:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Metric snapshot not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Metric snapshot not found"
+        )
     return MetricSnapshotResponse.model_validate(metric)
 
 
@@ -75,9 +71,7 @@ def get_realtime_metrics(
     _: UUID = Depends(require_ceo),
 ):
     """Get real-time business metrics for a specific business."""
-    result = db.execute(
-        select(Business).where(Business.id == business_id)
-    )
+    result = db.execute(select(Business).where(Business.id == business_id))
     business = result.scalar_one_or_none()
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
@@ -187,9 +181,7 @@ def create_metric(
     _: UUID = Depends(require_ceo),
 ):
     """Create a new metric snapshot for a business."""
-    result = db.execute(
-        select(Business).where(Business.id == request.business_id)
-    )
+    result = db.execute(select(Business).where(Business.id == request.business_id))
     business = result.scalar_one_or_none()
     if not business:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Business not found")
@@ -228,12 +220,12 @@ def delete_metric(
     _: UUID = Depends(require_ceo),
 ):
     """Delete a metric snapshot."""
-    result = db.execute(
-        select(MetricSnapshot).where(MetricSnapshot.id == metric_id)
-    )
+    result = db.execute(select(MetricSnapshot).where(MetricSnapshot.id == metric_id))
     metric = result.scalar_one_or_none()
     if not metric:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Metric snapshot not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Metric snapshot not found"
+        )
 
     db.delete(metric)
     db.flush()

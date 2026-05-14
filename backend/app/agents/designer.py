@@ -1,8 +1,9 @@
-from typing import Dict, Any, List, Optional
-from uuid import UUID
 import json
 import logging
-from app.agents.base_agent import BaseAgent, AgentResult
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from app.agents.base_agent import AgentResult, BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +36,7 @@ class DesignerAgent(BaseAgent):
         return []
 
     async def execute_task(
-        self,
-        task_type: str,
-        input_data: Dict[str, Any],
-        context: Optional[Dict] = None
+        self, task_type: str, input_data: Dict[str, Any], context: Optional[Dict] = None
     ) -> AgentResult:
         if task_type == "create_brand_identity":
             return await self._create_brand_identity(input_data)
@@ -49,11 +47,7 @@ class DesignerAgent(BaseAgent):
         elif task_type == "edit_image":
             return await self._edit_image(input_data)
         else:
-            return AgentResult(
-                success=False,
-                output=None,
-                error=f"Unknown task type: {task_type}"
-            )
+            return AgentResult(success=False, output=None, error=f"Unknown task type: {task_type}")
 
     async def _create_brand_identity(self, data: Dict[str, Any]) -> AgentResult:
         business_name = data.get("business_name", "Unknown")
@@ -67,7 +61,9 @@ class DesignerAgent(BaseAgent):
         )
 
         try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a senior brand designer.")
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a senior brand designer."
+            )
             output = json.loads(response)
 
             return AgentResult(

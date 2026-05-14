@@ -1,7 +1,6 @@
-from sqlalchemy import Column, String, Integer, DateTime, Numeric, Boolean
-from sqlalchemy.sql import func
-from .base import BaseModel, GUID
+from sqlalchemy import Boolean, Column, DateTime, Integer, Numeric, String
 
+from .base import GUID, BaseModel
 
 TIER_LIMITS = {
     "starter": {"businesses": 1, "ai_budget": 50.0, "price": 29},

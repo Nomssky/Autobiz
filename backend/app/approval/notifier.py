@@ -1,12 +1,12 @@
 """
 Approval Notifier — Real notification delivery via Discord, Email, and SMS.
 """
-import os
+
 import logging
-import uuid
-from typing import Dict, Any, Optional, List
-from datetime import datetime
+import os
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class NotificationChannel:
     """Represents a notification channel configuration."""
+
     name: str
     enabled: bool
     config: Dict[str, Any]
@@ -26,10 +27,14 @@ class DiscordNotifier:
         self.webhook_url = webhook_url
         self.enabled = bool(webhook_url)
 
-    async def send(self, title: str, message: str,
-                   color: int = 0x3498db,
-                   fields: Optional[List[Dict[str, str]]] = None,
-                   footer: Optional[str] = None) -> bool:
+    async def send(
+        self,
+        title: str,
+        message: str,
+        color: int = 0x3498DB,
+        fields: Optional[List[Dict[str, str]]] = None,
+        footer: Optional[str] = None,
+    ) -> bool:
         """
         Send a Discord embed notification.
 
@@ -62,7 +67,6 @@ class DiscordNotifier:
         payload = {"embeds": [embed]}
 
         try:
-            import asyncio
             import aiohttp
 
             async with aiohttp.ClientSession() as session:
@@ -79,6 +83,7 @@ class DiscordNotifier:
             # Fallback to requests for sync usage
             try:
                 import requests
+
                 resp = requests.post(self.webhook_url, json=payload, timeout=10)
                 if resp.status_code in (200, 204):
                     logger.info(f"Discord notification sent: {title}")
@@ -104,8 +109,9 @@ class EmailNotifier:
         self.from_email = os.environ.get("EMAIL_FROM", "noreply@autobiz.ai")
         self.enabled = bool(self.api_key)
 
-    async def send(self, to: str, subject: str, html_content: str,
-                   plain_text: Optional[str] = None) -> bool:
+    async def send(
+        self, to: str, subject: str, html_content: str, plain_text: Optional[str] = None
+    ) -> bool:
         """
         Send an email notification.
 
@@ -126,8 +132,9 @@ class EmailNotifier:
             logger.warning(f"Unknown email provider: {self.provider}")
             return False
 
-    async def _send_resend(self, to: str, subject: str, html: str,
-                           text: Optional[str] = None) -> bool:
+    async def _send_resend(
+        self, to: str, subject: str, html: str, text: Optional[str] = None
+    ) -> bool:
         """Send via Resend API."""
         try:
             import aiohttp
@@ -148,7 +155,7 @@ class EmailNotifier:
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
                         "Content-Type": "application/json",
-                    }
+                    },
                 ) as resp:
                     if resp.status in (200, 201):
                         logger.info(f"Email sent via Resend to {to}")
@@ -161,6 +168,7 @@ class EmailNotifier:
         except ImportError:
             try:
                 import requests
+
                 payload = {
                     "from": self.from_email,
                     "to": [to],
@@ -192,8 +200,9 @@ class EmailNotifier:
             logger.error(f"Resend email failed: {e}")
             return False
 
-    async def _send_sendgrid(self, to: str, subject: str, html: str,
-                             text: Optional[str] = None) -> bool:
+    async def _send_sendgrid(
+        self, to: str, subject: str, html: str, text: Optional[str] = None
+    ) -> bool:
         """Send via SendGrid API."""
         try:
             import requests
@@ -204,7 +213,7 @@ class EmailNotifier:
                 "subject": subject,
                 "content": [
                     {"type": "text/html", "value": html},
-                ]
+                ],
             }
             if text:
                 payload["content"].append({"type": "text/plain", "value": text})
@@ -256,6 +265,7 @@ class SMSNotifier:
 
         try:
             from twilio.rest import Client
+
             client = Client(self.account_sid, self.auth_token)
 
             message = client.messages.create(
@@ -285,27 +295,27 @@ class ApprovalNotifier:
     """
 
     def __init__(self):
-        self.discord = DiscordNotifier(
-            os.environ.get("DISCORD_WEBHOOK_URL", "")
-        )
+        self.discord = DiscordNotifier(os.environ.get("DISCORD_WEBHOOK_URL", ""))
         self.email = EmailNotifier()
         self.sms = SMSNotifier()
 
-    def _build_approval_embed(self, approval: Dict[str, Any],
-                               decision: str = "pending") -> Dict[str, Any]:
+    def _build_approval_embed(
+        self, approval: Dict[str, Any], decision: str = "pending"
+    ) -> Dict[str, Any]:
         """Build a Discord embed for an approval notification."""
-        urgency_colors = {
-            "critical": 0xe74c3c,
-            "high": 0xe67e22,
-            "normal": 0x3498db,
-            "low": 0x95a5a6,
-        }
+        # Colors for urgency levels (critical=red, high=orange, normal=blue, low=gray)
+        # _urgency_colors = {
+        #     "critical": 0xE74C3C,
+        #     "high": 0xE67E22,
+        #     "normal": 0x3498DB,
+        #     "low": 0x95A5A6,
+        # }
 
         status_colors = {
-            "pending": 0xf39c12,
-            "approved": 0x2ecc71,
-            "rejected": 0xe74c3c,
-            "expired": 0x95a5a6,
+            "pending": 0xF39C12,
+            "approved": 0x2ECC71,
+            "rejected": 0xE74C3C,
+            "expired": 0x95A5A6,
         }
 
         color = status_colors.get(decision, status_colors.get("pending"))
@@ -320,7 +330,9 @@ class ApprovalNotifier:
         proposed = approval.get("proposed_changes")
         if proposed and isinstance(proposed, dict):
             changes_summary = "\n".join(f"{k}: {v}" for k, v in list(proposed.items())[:5])
-            fields.append({"name": "Proposed Changes", "value": changes_summary[:1024], "inline": False})
+            fields.append(
+                {"name": "Proposed Changes", "value": changes_summary[:1024], "inline": False}
+            )
 
         impact = approval.get("impact_analysis")
         if impact and isinstance(impact, dict):
@@ -337,8 +349,7 @@ class ApprovalNotifier:
             "footer": {"text": footer},
         }
 
-    def _build_approval_email(self, approval: Dict[str, Any],
-                               decision: str = "pending") -> tuple:
+    def _build_approval_email(self, approval: Dict[str, Any], decision: str = "pending") -> tuple:
         """Build email subject and HTML content for approval notification."""
         title = approval.get("title", "Untitled Approval")
         desc = approval.get("description", "")
@@ -444,10 +455,7 @@ View in Dashboard: https://autobiz.ai/businesses/{business_id}/approvals
         urgency = approval_request.get("urgency", "normal")
         if urgency in ("critical", "high"):
             sms_body = f"URGENT Approval needed: {approval_request.get('title', 'Untitled')}"
-            sms_result = await self.sms.send(
-                os.environ.get("CEO_PHONE", "+10000000000"),
-                sms_body
-            )
+            sms_result = await self.sms.send(os.environ.get("CEO_PHONE", "+10000000000"), sms_body)
             results.append(("sms", sms_result))
 
         # Log results
@@ -481,7 +489,7 @@ View in Dashboard: https://autobiz.ai/businesses/{business_id}/approvals
         results = []
 
         # Discord notification
-        color = 0x2ecc71 if decision == "approved" else 0xe74c3c
+        color = 0x2ECC71 if decision == "approved" else 0xE74C3C
         emoji = "✅" if decision == "approved" else "❌"
 
         discord_result = await self.discord.send(

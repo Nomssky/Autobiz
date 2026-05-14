@@ -4,9 +4,10 @@ Revision ID: multi_tenancy_v1
 Revises: perf_indexes_v1
 Create Date: 2026-05-13
 """
-from alembic import op
+
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from alembic import op
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 
 revision = "multi_tenancy_v1"
 down_revision = "perf_indexes_v1"
@@ -69,15 +70,27 @@ def upgrade():
     )
 
     # Add org_id to existing tables
-    for table in ["businesses", "ai_tasks", "approval_requests",
-                   "metrics_snapshots", "subscriptions", "deployments"]:
+    for table in [
+        "businesses",
+        "ai_tasks",
+        "approval_requests",
+        "metrics_snapshots",
+        "subscriptions",
+        "deployments",
+    ]:
         op.add_column(table, sa.Column("org_id", UUID(as_uuid=True), nullable=True))
         op.create_index(f"ix_{table}_org", table, ["org_id"])
 
 
 def downgrade():
-    for table in ["businesses", "ai_tasks", "approval_requests",
-                   "metrics_snapshots", "subscriptions", "deployments"]:
+    for table in [
+        "businesses",
+        "ai_tasks",
+        "approval_requests",
+        "metrics_snapshots",
+        "subscriptions",
+        "deployments",
+    ]:
         op.drop_index(f"ix_{table}_org", table_name=table)
         op.drop_column(table, "org_id")
 

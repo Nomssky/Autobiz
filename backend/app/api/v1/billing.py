@@ -1,14 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func, extract
-from sqlalchemy.orm import Session
-from uuid import UUID
 from datetime import datetime, timedelta
+from uuid import UUID
 
-from app.api.dependencies import get_db_session, get_current_user
-from app.config import settings
 import stripe
-from app.models.subscription import Subscription
+from app.api.dependencies import get_current_user, get_db_session
+from app.config import settings
 from app.models.agent_execution import AgentExecution
+from app.models.subscription import Subscription
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/billing", tags=["billing"])
 
@@ -84,10 +84,12 @@ def get_cost_breakdown(
             func.sum(AgentExecution.input_tokens + AgentExecution.output_tokens).label("tokens"),
             func.sum(AgentExecution.cost_usd).label("cost"),
             func.count(AgentExecution.id).label("executions"),
-        ).where(
+        )
+        .where(
             AgentExecution.business_id == business_id,
             AgentExecution.created_at >= month_start,
-        ).group_by(AgentExecution.role_name)
+        )
+        .group_by(AgentExecution.role_name)
     ).all()
 
     breakdown = []
@@ -95,12 +97,14 @@ def get_cost_breakdown(
     for row in results:
         cost = float(row.cost or 0)
         total_cost += cost
-        breakdown.append({
-            "role": row.role_name,
-            "tokens": int(row.tokens or 0),
-            "cost": round(cost, 4),
-            "executions": row.executions,
-        })
+        breakdown.append(
+            {
+                "role": row.role_name,
+                "tokens": int(row.tokens or 0),
+                "cost": round(cost, 4),
+                "executions": row.executions,
+            }
+        )
 
     return {
         "business_id": str(business_id),

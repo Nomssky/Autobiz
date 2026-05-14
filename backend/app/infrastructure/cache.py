@@ -2,15 +2,15 @@
 Redis Cache Layer for AutoBiz Engine
 Provides caching utilities to reduce database load and improve response times.
 """
+
+import hashlib
 import json
 import logging
-import hashlib
-from functools import wraps
-from typing import Any, Optional, Callable, TypeVar, ParamSpec
 from datetime import timedelta
+from typing import Any, Callable, Optional, ParamSpec, TypeVar
 
-from redis import Redis
 from app.config import settings
+from redis import Redis
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +73,7 @@ def cache_result(
         def get_business_metrics(business_id: str) -> dict:
             ...
     """
+
     def decorator(func: F) -> F:
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> Any:
             redis = get_redis()
@@ -106,6 +107,7 @@ def cache_result(
         wrapper.__name__ = func.__name__
         wrapper.__wrapped__ = func  # type: ignore
         return wrapper  # type: ignore
+
     return decorator
 
 

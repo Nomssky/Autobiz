@@ -1,21 +1,20 @@
-from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List, Type
-from uuid import UUID
-import asyncio
 import logging
+from abc import ABC, abstractmethod
 from datetime import datetime
-from pydantic import BaseModel, ValidationError
+from typing import Any, Dict, List, Optional, Type
+from uuid import UUID
 
 from app.config import settings
+from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
 # ---- Real LLM integration with silent mock fallback ----
 
 try:
-    from langchain_openai import ChatOpenAI as _RealChatOpenAI
-    from langchain_core.tools import Tool as _RealTool
     from langchain_core.messages import HumanMessage, SystemMessage
+    from langchain_core.tools import Tool as _RealTool
+    from langchain_openai import ChatOpenAI as _RealChatOpenAI
 
     class ChatOpenAI:
         def __init__(self, model: str, temperature: float, api_key: str):
@@ -33,8 +32,16 @@ try:
             messages.append(HumanMessage(content=prompt))
             result = await self._llm.ainvoke(messages)
             self.last_token_usage = {
-                "input_tokens": result.usage_metadata.get("input_tokens", 0) if hasattr(result, "usage_metadata") else 0,
-                "output_tokens": result.usage_metadata.get("output_tokens", 0) if hasattr(result, "usage_metadata") else 0,
+                "input_tokens": (
+                    result.usage_metadata.get("input_tokens", 0)
+                    if hasattr(result, "usage_metadata")
+                    else 0
+                ),
+                "output_tokens": (
+                    result.usage_metadata.get("output_tokens", 0)
+                    if hasattr(result, "usage_metadata")
+                    else 0
+                ),
             }
             return result.content
 
@@ -57,6 +64,7 @@ except ImportError:
             self.name = name
             self.func = func
             self.description = description
+
 
 logger = logging.getLogger(__name__)
 
@@ -81,15 +89,11 @@ class AgentResult(BaseModel):
             logger.error(f"Output validation failed: {e}")
             raise
 
+
 class BaseAgent(ABC):
     """Abstract base class for all AI agents"""
-    
-    def __init__(
-        self,
-        business_id: UUID,
-        role_name: str,
-        config: Dict[str, Any]
-    ):
+
+    def __init__(self, business_id: UUID, role_name: str, config: Dict[str, Any]):
         self.business_id = business_id
         self.role_name = role_name
         self.config = config
@@ -100,37 +104,30 @@ class BaseAgent(ABC):
         )
         self.vector_store = None
         self.memory = {}
-        
+
     @abstractmethod
     async def execute_task(
-        self,
-        task_type: str,
-        input_data: Dict[str, Any],
-        context: Optional[Dict] = None
+        self, task_type: str, input_data: Dict[str, Any], context: Optional[Dict] = None
     ) -> AgentResult:
         """Execute a specific task for this agent role"""
         pass
-    
+
     @abstractmethod
     def get_tools(self) -> List[Tool]:
         """Return list of tools available to this agent"""
         pass
-    
-    async def run_with_tracking(
-        self,
-        task_type: str,
-        input_data: Dict[str, Any]
-    ) -> AgentResult:
+
+    async def run_with_tracking(self, task_type: str, input_data: Dict[str, Any]) -> AgentResult:
         """Run task with logging, token tracking, and error handling"""
         start_time = datetime.now()
-        
+
         try:
             result = await self.execute_task(task_type, input_data)
-            
+
             end_time = datetime.now()
             duration_ms = int((end_time - start_time).total_seconds() * 1000)
             result.execution_time_ms = duration_ms
-            
+
             # Estimate tokens if not set by agent
             if not result.tokens_used:
                 output_str = str(result.output or "")
@@ -139,21 +136,17 @@ class BaseAgent(ABC):
                     "input_tokens": len(input_str) // 4,
                     "output_tokens": len(output_str) // 4,
                 }
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"Agent {self.role_name} failed: {str(e)}", exc_info=True)
-            return AgentResult(
-                success=False,
-                output=None,
-                error=str(e)
-            )
-    
+            return AgentResult(success=False, output=None, error=str(e))
+
     async def save_to_memory(self, key: str, value: Any, metadata: Dict = None):
         """Save important context to vector memory"""
         self.memory[key] = {"value": value, "metadata": metadata or {}}
-    
+
     async def retrieve_from_memory(self, query: str, limit: int = 5) -> List[Dict]:
         """Retrieve relevant context from memory"""
         # Simple mock: return memories that have the query in the key

@@ -1,9 +1,11 @@
-from sqlalchemy import Column, String, Text, DateTime, Numeric, Boolean, ForeignKey
-from .base import BaseModel, GUID
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Numeric, String, Text
+
+from .base import GUID, BaseModel
+
 
 class UserFeedback(BaseModel):
     __tablename__ = "user_feedback"
-    
+
     business_id = Column(GUID(), ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False)
     user_id = Column(String(255), nullable=True)
     feedback_type = Column(String(50), nullable=True)  # bug, feature_request, praise, complaint
