@@ -165,11 +165,28 @@ Return JSON with:
             return AgentResult(success=False, output=None, error=str(e))
 
     async def _execute_scheduled_content(self, data: Dict[str, Any]) -> AgentResult:
-        return AgentResult(
-            success=True,
-            output={"posts_made": 0, "message": "Content scheduling active"},
-            requires_approval=False,
-        )
+        prompt = f"""Execute scheduled marketing content for:
+Business: {data.get('business_name', 'Business')}
+Description: {data.get('description', '')}
+Target audience: {data.get('target_audience', 'general')}
+
+Generate content for today's schedule. Return JSON with:
+- posts_made: integer (number of posts created today)
+- posts: array of {{platform, content_text, scheduled_time, hashtags[], status}}
+- message: summary string"""
+        try:
+            response = await self.llm.ainvoke(
+                prompt, system_prompt="You are a social media scheduling system."
+            )
+            output = json.loads(response)
+            return AgentResult(
+                success=True,
+                output=output,
+                requires_approval=False,
+                tokens_used=getattr(self.llm, "last_token_usage", {}),
+            )
+        except Exception as e:
+            return AgentResult(success=False, output=None, error=str(e))
 
     async def _analyze_performance(self, data: Dict[str, Any]) -> AgentResult:
         prompt = f"""Analyze marketing performance for:

@@ -65,26 +65,52 @@ def collect_business_knowledge(db_session):
     return documents
 
 
-def generate_mock_embeddings(documents: list, dimension: int = 1536) -> list:
-    """Generate mock embeddings for testing.
+def generate_embeddings(documents: list, dimension: int = 1536) -> list:
+    """Generate real embeddings using configured provider (Ollama or OpenAI)."""
+    from app.config import settings as s
 
-    In production, replace with real embedding model (OpenAI, Cohere, etc.).
-    """
-    import hashlib
+    provider = (s.EMBEDDING_PROVIDER or "ollama").lower()
+    model = s.EMBEDDING_MODEL or s.OPENAI_EMBEDDING_MODEL or "nomic-embed-text"
+    api_key = s.EMBEDDING_API_KEY or s.OPENAI_API_KEY or s.LLM_API_KEY or ""
+    base_url = s.EMBEDDING_BASE_URL or ""
 
-    embeddings = []
-    for doc in documents:
-        # Deterministic mock embedding based on document ID
-        seed = hashlib.md5(doc["id"].encode()).hexdigest()
-        vector = [
-            float(int(seed[i : i + 2], 16) % 1000) / 1000
-            for i in range(0, min(len(seed), dimension * 4), 4)
-        ]
-        # Pad or truncate to exact dimension
-        vector = (vector + [0.0] * dimension)[:dimension]
-        embeddings.append({**doc, "vector": vector})
+    texts = [doc["text"] for doc in documents]
+    logger.info(f"Generating {len(texts)} embeddings via {provider}/{model}")
 
-    return embeddings
+    if provider == "ollama":
+        import httpx
+        url = (base_url or s.OLLAMA_BASE_URL or "http://localhost:11434") + "/api/embed"
+        embeddings = []
+        for i, doc in enumerate(documents):
+            try:
+                resp = httpx.post(url, json={"model": model, "input": doc["text"]}, timeout=60)
+                resp.raise_for_status()
+                vector = resp.json()["embeddings"][0]
+                embeddings.append({**doc, "vector": vector})
+                if (i + 1) % 10 == 0:
+                    logger.info(f"  Embedded {i + 1}/{len(texts)}")
+            except Exception as e:
+                logger.error(f"Failed to embed doc {doc['id']}: {e}")
+                vector = [0.0] * dimension
+                embeddings.append({**doc, "vector": vector})
+        return embeddings
+
+    else:
+        import openai as _openai
+        client = _openai.OpenAI(api_key=api_key or None, base_url=base_url or None)
+        embeddings = []
+        for i, doc in enumerate(documents):
+            try:
+                resp = client.embeddings.create(model=model, input=doc["text"])
+                vector = resp.data[0].embedding
+                embeddings.append({**doc, "vector": vector})
+                if (i + 1) % 10 == 0:
+                    logger.info(f"  Embedded {i + 1}/{len(texts)}")
+            except Exception as e:
+                logger.error(f"Failed to embed doc {doc['id']}: {e}")
+                vector = [0.0] * dimension
+                embeddings.append({**doc, "vector": vector})
+        return embeddings
 
 
 def main():
@@ -112,7 +138,7 @@ def main():
 
         # 2. Generate embeddings
         print("🧠 Generating embeddings...")
-        embedded_docs = generate_mock_embeddings(documents)
+        embedded_docs = generate_embeddings(documents)
 
         # 3. Initialize vector store
         print("💾 Connecting to vector store...")

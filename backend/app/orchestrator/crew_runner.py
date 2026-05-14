@@ -142,9 +142,11 @@ class CrewRunner:
                         approval_id = await approval_gateway.create_approval_request(
                             self.business_id, None, proposal, urgency="low"
                         )
+                        # Resolve real ceo_id from business
+                        ceo_id = self._resolve_ceo_id_for_business(self.business_id) or self.business_id
                         await approval_gateway.process_decision(
                             approval_id,
-                            self.business_id,  # Using business_id as placeholder
+                            ceo_id,
                             "approve",
                             "Auto-approved: low impact task",
                         )
@@ -153,6 +155,23 @@ class CrewRunner:
                     logger.error(f"Auto-approval failed for {task_id}: {e}")
 
         return result
+
+    def _resolve_ceo_id_for_business(self, business_id: UUID):
+        """Look up the real ceo_id for a business from the database."""
+        try:
+            from app.database import get_db_session
+            from app.models.business import Business
+            from sqlalchemy import select
+
+            with get_db_session() as session:
+                biz = session.execute(
+                    select(Business).where(Business.id == business_id)
+                ).scalar_one_or_none()
+                if biz:
+                    return biz.ceo_id
+        except Exception as e:
+            logger.warning(f"Could not resolve ceo_id for business {business_id}: {e}")
+        return None
 
     def get_execution_log(self) -> List[Dict[str, Any]]:
         """Get the full execution log for this crew run"""

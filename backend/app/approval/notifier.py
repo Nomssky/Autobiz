@@ -448,8 +448,7 @@ View in Dashboard: https://autobiz.ai/businesses/{business_id}/approvals
 
         # Email notification
         subject, html, plain = self._build_approval_email(approval_request, "pending")
-        # CEO email would come from user profile - using placeholder
-        ceo_email = os.environ.get("CEO_EMAIL", "ceo@example.com")
+        ceo_email = self._resolve_ceo_email(approval_request)
         email_result = await self.email.send(ceo_email, subject, html, plain)
         results.append(("email", email_result))
 
@@ -457,7 +456,7 @@ View in Dashboard: https://autobiz.ai/businesses/{business_id}/approvals
         urgency = approval_request.get("urgency", "normal")
         if urgency in ("critical", "high"):
             sms_body = f"URGENT Approval needed: {approval_request.get('title', 'Untitled')}"
-            sms_result = await self.sms.send(os.environ.get("CEO_PHONE", "+10000000000"), sms_body)
+            sms_result = await self.sms.send(self._resolve_ceo_phone(approval_request), sms_body)
             results.append(("sms", sms_result))
 
         # Log results
@@ -537,6 +536,54 @@ View in Dashboard: https://autobiz.ai/businesses/{business_id}/approvals
     async def notify_ceo_about_approval(self, approval_data: Dict) -> bool:
         """Notify CEO about an approval request (alias for notify_ceo)."""
         return await self.notify_ceo(approval_data)
+
+    def _resolve_ceo_email(self, approval_data: Dict) -> str:
+        """Resolve CEO email from user profile or approval data."""
+        business_id = approval_data.get("business_id", "")
+        if business_id:
+            try:
+                from app.database import get_db_session
+                from app.models.business import Business
+                from app.models.user import User
+                from sqlalchemy import select
+
+                with get_db_session() as session:
+                    biz = session.execute(
+                        select(Business).where(Business.id == business_id)
+                    ).scalar_one_or_none()
+                    if biz:
+                        user = session.execute(
+                            select(User).where(User.id == biz.ceo_id)
+                        ).scalar_one_or_none()
+                        if user and user.email:
+                            return user.email
+            except Exception:
+                pass
+        return os.environ.get("CEO_EMAIL", "")
+
+    def _resolve_ceo_phone(self, approval_data: Dict) -> str:
+        """Resolve CEO phone — currently from env, future from user profile."""
+        business_id = approval_data.get("business_id", "")
+        if business_id:
+            try:
+                from app.database import get_db_session
+                from app.models.business import Business
+                from app.models.user import User
+                from sqlalchemy import select
+
+                with get_db_session() as session:
+                    biz = session.execute(
+                        select(Business).where(Business.id == business_id)
+                    ).scalar_one_or_none()
+                    if biz:
+                        user = session.execute(
+                            select(User).where(User.id == biz.ceo_id)
+                        ).scalar_one_or_none()
+                        if user and hasattr(user, "phone") and user.phone:
+                            return user.phone
+            except Exception:
+                pass
+        return os.environ.get("CEO_PHONE", "")
 
     async def send_system_alert(
         self, alert_type: str, message: str, severity: str = "info"

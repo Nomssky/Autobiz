@@ -161,11 +161,10 @@ def create_checkout_session(
         return {"url": session.url, "session_id": session.id}
 
     except ImportError:
-        return {
-            "url": f"https://checkout.stripe.com/pay?tier={tier}&user_id={user_id}",
-            "session_id": "cs_test_mock",
-            "_note": "Stripe library not installed — mock URL returned",
-        }
+        raise HTTPException(
+            status_code=501,
+            detail="Stripe library not installed. Run: pip install stripe",
+        )
 
 
 @router.get("/portal", summary="Get Stripe customer portal URL")

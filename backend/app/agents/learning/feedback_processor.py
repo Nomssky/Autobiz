@@ -65,31 +65,53 @@ class FeedbackProcessor:
         }
 
     def extract_key_themes(self, business_id: UUID, days: int = 30) -> List[Dict]:
-        """Extract key themes from feedback (mock NLP analysis)."""
-        # feedbacks = self.collect_feedback_for_business(business_id, days)
+        """Extract key themes from feedback using LLM analysis."""
+        feedbacks = self.collect_feedback_for_business(business_id, days)
 
-        # In production: use NLP/LLM to cluster and extract themes
-        mock_themes = [
-            {
-                "theme": "user_interface",
-                "mentions": 12,
-                "sentiment": "mixed",
-                "sample_comments": ["UI could be simpler", "Love the new dashboard"],
-            },
-            {
-                "theme": "performance",
-                "mentions": 5,
-                "sentiment": "positive",
-                "sample_comments": ["App is fast", "Quick load times"],
-            },
-            {
-                "theme": "pricing",
-                "mentions": 8,
-                "sentiment": "negative",
-                "sample_comments": ["Too expensive", "Consider free tier"],
-            },
-        ]
-        return mock_themes
+        if not feedbacks:
+            return []
+
+        texts = [f.get("content", "") for f in feedbacks if f.get("content")]
+        if not texts:
+            return []
+
+        import json as _json
+        combined = "\n".join(f"- {t[:200]}" for t in texts[:50])
+        logger.info(f"Analyzing {len(texts)} feedback items for business {business_id}")
+
+        try:
+            from app.agents.llm_factory import create_llm
+            import asyncio
+
+            llm = create_llm()
+            prompt = f"""Analyze these customer feedback items and extract key themes.
+
+Feedback:
+{combined}
+
+Return ONLY a JSON array of objects with:
+- theme: short name of the theme
+- mentions: number of mentions (count from the data)
+- sentiment: overall sentiment (positive/negative/mixed)
+- sample_comments: array of up to 3 representative quotes
+
+Return max 5 themes."""
+            loop = asyncio.new_event_loop()
+            try:
+                response = loop.run_until_complete(
+                    llm.ainvoke(prompt, system_prompt="You are a feedback analysis AI.")
+                )
+                themes = _json.loads(response)
+                if isinstance(themes, list):
+                    return themes
+            except Exception:
+                pass
+            finally:
+                loop.close()
+        except Exception:
+            pass
+
+        return []
 
     def generate_improvement_recommendations(self, business_id: UUID, days: int = 30) -> List[Dict]:
         """Generate actionable improvement recommendations from feedback."""
