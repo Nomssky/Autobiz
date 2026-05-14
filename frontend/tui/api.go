@@ -29,7 +29,7 @@ func (c *apiClient) setToken(token string) {
 }
 
 func (c *apiClient) doRequest(method, path string, body any, target any) error {
-	url := c.baseURL + path
+	url := c.baseURL + "/api/v1" + path
 	var reqBody io.Reader
 	if body != nil {
 		b, err := json.Marshal(body)
@@ -81,130 +81,52 @@ func (c *apiClient) doRequest(method, path string, body any, target any) error {
 
 func (c *apiClient) login(email, password string) (user, error) {
 	var u user
-	body := map[string]string{
-		"email":    email,
-		"password": password,
-	}
-	// Try both possible endpoint patterns
-	err := c.doRequest("POST", "/api/v1/auth/login", body, &u)
-	if err != nil {
-		// Fallback: try alternative login format
-		altBody := map[string]string{
-			"username": email,
-			"password": password,
-		}
-		var altResp struct {
-			AccessToken string `json:"access_token"`
-			TokenType   string `json:"token_type"`
-			User        user   `json:"user"`
-		}
-		if altErr := c.doRequest("POST", "/api/v1/auth/login", altBody, &altResp); altErr == nil {
-			u = altResp.User
-			u.Token = altResp.AccessToken
-			return u, nil
-		}
-		var directResp struct {
-			AccessToken string `json:"access_token"`
-			TokenType   string `json:"token_type"`
-			Email       string `json:"email"`
-			UserID      int    `json:"user_id"`
-		}
-		if directErr := c.doRequest("POST", "/api/v1/auth/login", body, &directResp); directErr == nil {
-			u.Token = directResp.AccessToken
-			u.Email = directResp.Email
-			u.ID = directResp.UserID
-			return u, nil
-		}
-		return u, err
-	}
-	return u, nil
+	body := map[string]string{"email": email, "password": password}
+	err := c.doRequest("POST", "/auth/login", body, &u)
+	return u, err
 }
 
-func (c *apiClient) register(email, username, password string) (user, error) {
+func (c *apiClient) register(email, name, password string) (user, error) {
 	var u user
-	body := map[string]string{
-		"email":    email,
-		"username": username,
-		"password": password,
-	}
-	err := c.doRequest("POST", "/api/v1/auth/register", body, &u)
-	if err != nil {
-		// Try response that returns user directly
-		var resp struct {
-			User  user   `json:"user"`
-			Token string `json:"token"`
-		}
-		if altErr := c.doRequest("POST", "/api/v1/auth/register", body, &resp); altErr == nil {
-			u = resp.User
-			u.Token = resp.Token
-			return u, nil
-		}
-		return u, err
-	}
-	return u, nil
+	body := map[string]string{"email": email, "name": name, "password": password}
+	err := c.doRequest("POST", "/auth/register", body, &u)
+	return u, err
 }
 
 func (c *apiClient) listBusinesses() ([]business, error) {
 	var businesses []business
-	err := c.doRequest("GET", "/api/v1/businesses/", nil, &businesses)
-	if err != nil {
-		return nil, err
-	}
-	return businesses, nil
+	err := c.doRequest("GET", "/businesses/", nil, &businesses)
+	return businesses, err
 }
 
 func (c *apiClient) createBusiness(idea string) (business, error) {
 	var b business
 	body := map[string]string{"idea": idea}
-	err := c.doRequest("POST", "/api/v1/businesses/create", body, &b)
-	if err != nil {
-		return b, err
-	}
-	return b, nil
-}
-
-func (c *apiClient) getBusiness(id int) (businessDetail, error) {
-	var b businessDetail
-	err := c.doRequest("GET", fmt.Sprintf("/api/v1/businesses/%d", id), nil, &b)
-	if err != nil {
-		return b, err
-	}
-	return b, nil
+	err := c.doRequest("POST", "/businesses/create", body, &b)
+	return b, err
 }
 
 func (c *apiClient) listPendingApprovals() ([]approvalRequest, error) {
 	var approvals []approvalRequest
-	err := c.doRequest("GET", "/api/v1/approvals/pending", nil, &approvals)
-	if err != nil {
-		// Try list endpoint
-		err2 := c.doRequest("GET", "/api/v1/approvals/", nil, &approvals)
-		if err2 != nil {
-			return nil, err
-		}
-	}
-	// Filter pending
-	var pending []approvalRequest
-	for _, a := range approvals {
-		if a.Status == "" || a.Status == "pending" {
-			pending = append(pending, a)
-		}
-	}
-	return pending, nil
+	err := c.doRequest("GET", "/approvals/pending", nil, &approvals)
+	return approvals, err
 }
 
-func (c *apiClient) decideApproval(id int, approved bool, reason string) error {
-	body := map[string]any{
-		"approved": approved,
-		"reason":   reason,
+func (c *apiClient) decideApproval(id, ceoID string, approve bool, comments string) error {
+	decision := "reject"
+	if approve {
+		decision = "approve"
 	}
-	return c.doRequest("POST", fmt.Sprintf("/api/v1/approvals/%d/decide", id), body, nil)
+	body := map[string]any{
+		"decision": decision,
+		"ceo_id":   ceoID,
+		"comments": comments,
+	}
+	return c.doRequest("POST", fmt.Sprintf("/approvals/%s/decide", id), body, nil)
 }
 
 func (c *apiClient) listMetrics() ([]metricSnapshot, error) {
 	var metrics []metricSnapshot
-	err := c.doRequest("GET", "/api/v1/metrics/", nil, &metrics)
-	if err != nil {
-		return nil, err
-	}
-	return metrics, nil
+	err := c.doRequest("GET", "/metrics/", nil, &metrics)
+	return metrics, err
 }

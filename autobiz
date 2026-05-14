@@ -9,15 +9,15 @@ cd "$(dirname "$0")"
 ROOT="$PWD"
 BACKEND_DIR="$ROOT/backend"
 TUI_BIN="$ROOT/frontend/tui/autobiz-tui"
-CLI_BIN="$ROOT/frontend/cli/bin/autobiz.js"
 
 # ─── Colors ──────────────────────────────────────────────
 BOLD='\033[1m'
 GREEN='\033[0;32m'
 CYAN='\033[0;36m'
 YELLOW='\033[1;33m'
+RED='\033[0;31m'
 DIM='\033[2m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 info()  { echo -e "  ${DIM}ℹ${NC} $1"; }
 ok()    { echo -e "  ${GREEN}✓${NC} $1"; }
@@ -31,14 +31,13 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
   ╚══════════════════════════════════════╝${NC}"
   echo ""
   echo -e "  ${BOLD}Usage:${NC}"
-  echo -e "    ${CYAN}./autobiz${NC}              Launch Terminal UI"
-  echo -e "    ${CYAN}./autobiz --web${NC}        Open web dashboard"
-  echo -e "    ${CYAN}./autobiz --help${NC}       Show this help"
-  echo ""
-  echo -e "  ${BOLD}Quick start:${NC}"
-  echo -e "    1. ${DIM}Install Ollama:${NC} ${CYAN}curl -fsSL https://ollama.com/install.sh | sh${NC}"
-  echo -e "    2. ${DIM}Pull a model:${NC}  ${CYAN}ollama pull llama3${NC}"
-  echo -e "    3. ${DIM}Run AutoBiz:${NC}   ${CYAN}./autobiz${NC}"
+   echo -e "    ${CYAN}./autobiz${NC}              Launch AutoBiz TUI"
+   echo -e "    ${CYAN}./autobiz --help${NC}       Show this help"
+   echo ""
+   echo -e "  ${BOLD}Quick start:${NC}"
+   echo -e "    1. ${DIM}Install Ollama:${NC} ${CYAN}curl -fsSL https://ollama.com/install.sh | sh${NC}"
+   echo -e "    2. ${DIM}Pull a model:${NC}  ${CYAN}ollama pull llama3${NC}"
+   echo -e "    3. ${DIM}Run:${NC}           ${CYAN}./autobiz${NC}"
   echo ""
   exit 0
 fi
@@ -104,9 +103,6 @@ start_backend() {
 
 # ─── Cleanup on exit ─────────────────────────────────────
 cleanup() {
-  if [ -n "$DASHBOARD_PID" ]; then
-    kill "$DASHBOARD_PID" 2>/dev/null || true
-  fi
   if [ -n "$BACKEND_PID" ]; then
     kill "$BACKEND_PID" 2>/dev/null || true
     ok "Backend stopped"
@@ -114,40 +110,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# ─── Web mode ────────────────────────────────────────────
-if [[ "$1" == "--web" || "$1" == "-w" ]]; then
-  if ! curl -sf http://localhost:8000/health > /dev/null 2>&1; then
-    start_backend
-  fi
-
-  # Auto-start dashboard
-  if command -v npm &>/dev/null; then
-    DASHBOARD_DIR="$ROOT/frontend/dashboard"
-    if [ ! -d "$DASHBOARD_DIR/node_modules" ]; then
-      info "Installing dashboard dependencies..."
-      cd "$DASHBOARD_DIR" && npm install --silent && cd "$ROOT"
-      ok "Dashboard dependencies installed"
-    fi
-    info "Starting web dashboard on http://localhost:3000..."
-    cd "$DASHBOARD_DIR" && npm run dev -- -p 3000 > /dev/null 2>&1 &
-    DASHBOARD_PID=$!
-    cd "$ROOT"
-    sleep 3
-  fi
-
-  echo ""
-  echo -e "  ${GREEN}🌐  Web Dashboard:${NC} ${BOLD}http://localhost:3000${NC}"
-  echo -e "  ${DIM}📡  API: http://localhost:8000${NC}"
-  echo -e "  ${DIM}Press Ctrl+C to stop${NC}"
-  echo ""
-
-  # Wait for either process
-  wait $BACKEND_PID 2>/dev/null
-  [ -n "$DASHBOARD_PID" ] && kill "$DASHBOARD_PID" 2>/dev/null
-  exit 0
-fi
-
-# ─── Interactive CLI mode (default) ──────────────────────
+# ─── Start TUI ───────────────────────────────────────────
 echo ""
 echo -e "  ${BOLD}AutoBiz Engine${NC} ${DIM}— build AI-powered businesses${NC}"
 echo ""
@@ -157,15 +120,10 @@ if ! curl -sf http://localhost:8000/health > /dev/null 2>&1; then
   start_backend
 fi
 
-# Launch Node.js CLI (matches backend API, auto-venv, interactive menus)
-if [ -f "$CLI_BIN" ]; then
-  # Pass through any autobiz arguments (e.g., direct idea)
-  node "$CLI_BIN" "$@"
-elif has_command node; then
-  warn "CLI script not found, trying npx..."
-  npx --yes github:Nomssky/Autobiz
+# Launch TUI
+if [ -f "$TUI_BIN" ]; then
+  "$TUI_BIN"
 else
-  echo -e "  ${YELLOW}⚠${NC} Node.js is required for the CLI."
+  echo -e "  ${RED}✗${NC} TUI binary not found at $TUI_BIN"
   echo -e "  ${DIM}  Backend is running at http://localhost:8000${NC}"
-  echo -e "  ${DIM}  Install Node.js and run:${NC} npx github:Nomssky/Autobiz"
 fi

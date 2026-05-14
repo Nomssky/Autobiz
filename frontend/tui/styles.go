@@ -107,4 +107,27 @@ var (
 
 	spinnerStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#7B59E0"))
+
+	valueStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#E0E0E0")).
+			Padding(0, 1)
+
+	selectedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#7B59E0")).
+			Bold(true)
+
+	labelStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#61AFEF")).
+			Bold(true)
+
+	dimStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#626262"))
+
+	warnStyle = lipgloss.NewStyle().
+			Foreground(warn).
+			Bold(true)
+
+	infoStyle = lipgloss.NewStyle().
+			Foreground(info).
+			Bold(true)
 )

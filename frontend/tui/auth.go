@@ -3,176 +3,120 @@ package main
 import (
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
+type authState int
+
+const (
+	authInputEmail authState = iota
+	authInputPassword
+	authInputName
+	authDone
+)
+
 type authModel struct {
-	state       appState
-	emailInput  textinput.Model
-	userInput   textinput.Model
-	passInput   textinput.Model
-	focusIndex  int
-	loading     bool
-	err         string
-	api         *apiClient
+	state      authState
+	api        *apiClient
+	email      string
+	password   string
+	name       string
+	err        string
+	focusIndex int
 }
 
 func newAuthModel(api *apiClient) authModel {
-	email := textinput.New()
-	email.Placeholder = "Email"
-	email.CharLimit = 100
-	email.Width = 40
-
-	user := textinput.New()
-	user.Placeholder = "Username"
-	user.CharLimit = 100
-	user.Width = 40
-
-	pass := textinput.New()
-	pass.Placeholder = "Password"
-	pass.EchoMode = textinput.EchoPassword
-	pass.CharLimit = 100
-	pass.Width = 40
-
-	return authModel{
-		state:      stateLogin,
-		emailInput: email,
-		userInput:  user,
-		passInput:  pass,
-		focusIndex: 0,
-		api:        api,
-	}
+	return authModel{api: api, state: authInputEmail}
 }
 
-func (m authModel) Init() tea.Cmd {
-	return textinput.Blink
-}
+func (m authModel) Init() tea.Cmd { return nil }
 
 func (m authModel) Update(msg tea.Msg) (authModel, tea.Cmd) {
-	var cmds []tea.Cmd
-
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c", "esc":
-			return m, tea.Quit
-		case "tab", "shift+tab", "up", "down":
-			if msg.String() == "up" || msg.String() == "shift+tab" {
-				m.focusIndex--
-				if m.focusIndex < 0 {
-					m.focusIndex = m.fieldCount() - 1
-				}
-			} else {
-				m.focusIndex++
-				if m.focusIndex >= m.fieldCount() {
-					m.focusIndex = 0
-				}
-			}
-			m.updateFocus()
 		case "enter":
-			if !m.loading && m.focusIndex == m.fieldCount()-1 {
-				m.loading = true
-				m.err = ""
-				if m.state == stateLogin {
-					return m, m.login()
-				}
-				return m, m.register()
+			return m.advance()
+		case "backspace":
+			return m.deleteChar(), nil
+		default:
+			if len(msg.String()) == 1 {
+				return m.addChar(msg.String()), nil
 			}
 		}
-	case errMsg:
-		m.loading = false
-		m.err = msg.Error()
-	case loggedInMsg:
-		m.loading = false
-		return m, func() tea.Msg { return msg }
 	}
-
-	cmd := m.updateInputs(msg)
-	cmds = append(cmds, cmd)
-	return m, tea.Batch(cmds...)
+	return m, nil
 }
 
-func (m *authModel) fieldCount() int {
-	if m.state == stateRegister {
-		return 4 // email, username, password, submit
+func (m authModel) addChar(ch string) authModel {
+	switch m.state {
+	case authInputEmail:
+		m.email += ch
+	case authInputPassword:
+		m.password += ch
+	case authInputName:
+		m.name += ch
 	}
-	return 3 // email, password, submit
+	return m
 }
 
-func (m *authModel) updateFocus() {
-	focused := 0
-	if m.state == stateRegister {
-		if m.focusIndex == 0 {
-			m.emailInput.Focus()
-			m.userInput.Blur()
-			m.passInput.Blur()
-		} else if m.focusIndex == 1 {
-			m.emailInput.Blur()
-			m.userInput.Focus()
-			m.passInput.Blur()
-		} else if m.focusIndex == 2 {
-			m.emailInput.Blur()
-			m.userInput.Blur()
-			m.passInput.Focus()
+func (m authModel) deleteChar() authModel {
+	switch m.state {
+	case authInputEmail:
+		if len(m.email) > 0 {
+			m.email = m.email[:len(m.email)-1]
 		}
-		focused = m.focusIndex
-	} else {
-		if m.focusIndex == 0 {
-			m.emailInput.Focus()
-			m.passInput.Blur()
-		} else if m.focusIndex == 1 {
-			m.emailInput.Blur()
-			m.passInput.Focus()
+	case authInputPassword:
+		if len(m.password) > 0 {
+			m.password = m.password[:len(m.password)-1]
 		}
-		focused = m.focusIndex
+	case authInputName:
+		if len(m.name) > 0 {
+			m.name = m.name[:len(m.name)-1]
+		}
 	}
-	if m.state == stateRegister && focused > 2 {
-		m.emailInput.Blur()
-		m.userInput.Blur()
-		m.passInput.Blur()
-	} else if m.state == stateLogin && focused > 1 {
-		m.emailInput.Blur()
-		m.passInput.Blur()
-	}
+	return m
 }
 
-func (m authModel) updateInputs(msg tea.Msg) tea.Cmd {
-	var cmds []tea.Cmd
-	var cmd tea.Cmd
-
-	m.emailInput, cmd = m.emailInput.Update(msg)
-	cmds = append(cmds, cmd)
-	if m.state == stateRegister {
-		m.userInput, cmd = m.userInput.Update(msg)
-		cmds = append(cmds, cmd)
+func (m authModel) advance() (authModel, tea.Cmd) {
+	switch m.state {
+	case authInputEmail:
+		if m.email == "" {
+			m.err = "Email is required"
+			return m, nil
+		}
+		m.state = authInputPassword
+		m.err = ""
+	case authInputPassword:
+		if m.password == "" {
+			m.err = "Password is required"
+			return m, nil
+		}
+		m.state = authInputName
+		m.err = ""
+	case authInputName:
+		m.state = authDone
+		m.err = ""
+		return m, m.loginOrRegister()
 	}
-	m.passInput, cmd = m.passInput.Update(msg)
-	cmds = append(cmds, cmd)
-
-	return tea.Batch(cmds...)
+	return m, nil
 }
 
-func (m authModel) login() tea.Cmd {
+func (m authModel) loginOrRegister() tea.Cmd {
 	return func() tea.Msg {
-		u, err := m.api.login(m.emailInput.Value(), m.passInput.Value())
+		if m.name == "" {
+			u, err := m.api.login(m.email, m.password)
+			if err != nil {
+				return errMsg{err}
+			}
+			return loggedInMsg{user: u}
+		}
+		u, err := m.api.register(m.email, m.name, m.password)
 		if err != nil {
 			return errMsg{err}
 		}
-		m.api.setToken(u.Token)
-		return loggedInMsg{u}
-	}
-}
-
-func (m authModel) register() tea.Cmd {
-	return func() tea.Msg {
-		u, err := m.api.register(m.emailInput.Value(), m.userInput.Value(), m.passInput.Value())
-		if err != nil {
-			return errMsg{err}
-		}
-		m.api.setToken(u.Token)
-		return loggedInMsg{u}
+		return loggedInMsg{user: u}
 	}
 }
 
@@ -182,44 +126,19 @@ func (m authModel) View() string {
 	b.WriteString(titleStyle.Render("AutoBiz Engine"))
 	b.WriteString("\n\n")
 
-	if m.state == stateLogin {
-		b.WriteString(subtitleStyle.Render("Login to your account"))
-	} else {
-		b.WriteString(subtitleStyle.Render("Create a new account"))
-	}
-	b.WriteString("\n\n")
-
-	b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Render("Email:"))
-	b.WriteString("\n")
-	b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Render(m.emailInput.View()))
-	b.WriteString("\n\n")
-
-	if m.state == stateRegister {
-		b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Render("Username:"))
+	switch m.state {
+	case authInputEmail:
+		b.WriteString(inputStyle.Render("Email:"))
 		b.WriteString("\n")
-		b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Render(m.userInput.View()))
-		b.WriteString("\n\n")
-	}
-
-	b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Render("Password:"))
-	b.WriteString("\n")
-	b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Render(m.passInput.View()))
-	b.WriteString("\n\n")
-
-	if m.loading {
-		b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color("#7B59E0")).Render("Authenticating..."))
-	} else {
-		btnIndex := 2
-		if m.state == stateRegister {
-			btnIndex = 3
-		}
-		if m.focusIndex == btnIndex {
-			b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Render(buttonStyle.Render("  Submit  ")))
-		} else {
-			b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Render(
-				lipgloss.NewStyle().Foreground(lipgloss.Color("#626262")).Render("[ Submit ]"),
-			))
-		}
+		b.WriteString(valueStyle.Render(m.email + cursor()))
+	case authInputPassword:
+		b.WriteString(inputStyle.Render("Password:"))
+		b.WriteString("\n")
+		b.WriteString(valueStyle.Render(strings.Repeat("•", len(m.password)) + cursor()))
+	case authInputName:
+		b.WriteString(inputStyle.Render("Name (leave empty to login):"))
+		b.WriteString("\n")
+		b.WriteString(valueStyle.Render(m.name + cursor()))
 	}
 
 	if m.err != "" {
@@ -228,15 +147,10 @@ func (m authModel) View() string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(helpStyle.Render("tab: navigate • enter: submit • esc: quit"))
-
-	if m.state == stateLogin {
-		b.WriteString("\n")
-		b.WriteString(helpStyle.Render("Don't have an account? Press 'r' to register"))
-	} else {
-		b.WriteString("\n")
-		b.WriteString(helpStyle.Render("Already have an account? Press 'l' to login"))
-	}
-
+	b.WriteString(helpStyle.Render("Enter: next • Backspace: delete • Ctrl+C: quit"))
 	return appStyle.Render(b.String())
+}
+
+func cursor() string {
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("36")).Render("█")
 }

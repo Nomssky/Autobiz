@@ -9,59 +9,42 @@ const (
 )
 
 type user struct {
-	ID       int    `json:"id"`
-	Email    string `json:"email"`
-	Username string `json:"username"`
-	Token    string `json:"token"`
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	UserID      string `json:"user_id"`
+	Email       string `json:"email"`
+	Name        string `json:"name"`
+	Role        string `json:"role"`
 }
 
 type business struct {
-	ID          int    `json:"id"`
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Status      string `json:"status"`
-	Idea        string `json:"idea"`
+	CurrentPhase string `json:"current_phase"`
 	CreatedAt   string `json:"created_at"`
 	UpdatedAt   string `json:"updated_at"`
-}
-
-type businessDetail struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Status      string `json:"status"`
-	Idea        string `json:"idea"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
-	Progress    int    `json:"progress"`
-	Agents      []agentStatus `json:"agents"`
-}
-
-type agentStatus struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
-	Output string `json:"output"`
 }
 
 type approvalRequest struct {
-	ID         int    `json:"id"`
-	BusinessID int    `json:"business_id"`
-	Title      string `json:"title"`
-	AgentName  string `json:"agent_name"`
-	Summary    string `json:"summary"`
-	Details    string `json:"details"`
-	Status     string `json:"status"`
-	CreatedAt  string `json:"created_at"`
-	BusinessName string `json:"business_name"`
+	ID           string `json:"id"`
+	BusinessID   string `json:"business_id"`
+	Title        string `json:"title"`
+	Description  string `json:"description"`
+	Urgency      string `json:"urgency"`
+	Status       string `json:"status"`
+	CreatedAt    string `json:"created_at"`
 }
 
 type metricSnapshot struct {
-	ID         int     `json:"id"`
-	BusinessID int     `json:"business_id"`
-	Name       string  `json:"name"`
-	Value      float64 `json:"value"`
-	Unit       string  `json:"unit"`
-	Timestamp  string  `json:"timestamp"`
+	ID              string  `json:"id"`
+	BusinessID      string  `json:"business_id"`
+	RecordedByRole  string  `json:"recorded_by_role"`
+	DailyRevenue    float64 `json:"daily_revenue"`
+	UsersCount      int     `json:"users_count"`
+	ChurnRate       float64 `json:"churn_rate"`
+	CreatedAt       string  `json:"created_at"`
 }
 
 type tab int

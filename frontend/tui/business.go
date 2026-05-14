@@ -5,244 +5,180 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 func (m *model) updateBusinesses(msg tea.Msg) tea.Cmd {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.String() {
-		case "esc":
-			if m.dash.businesses.page == pageDetail || m.dash.businesses.page == pageCreate {
-				m.dash.businesses.page = pageList
-				return nil
-			}
-		case "up", "k":
-			if m.dash.businesses.page == pageList && len(m.dash.businesses.businesses) > 0 {
-				m.dash.businesses.selected--
-				if m.dash.businesses.selected < 0 {
-					m.dash.businesses.selected = len(m.dash.businesses.businesses) - 1
-				}
-			}
-		case "down", "j":
-			if m.dash.businesses.page == pageList && len(m.dash.businesses.businesses) > 0 {
-				m.dash.businesses.selected++
-				if m.dash.businesses.selected >= len(m.dash.businesses.businesses) {
-					m.dash.businesses.selected = 0
-				}
-			}
-		case "enter":
-			if m.dash.businesses.page == pageList && len(m.dash.businesses.businesses) > 0 {
-				return m.loadBusinessDetail(m.dash.businesses.businesses[m.dash.businesses.selected].ID)
-			}
-		case "n":
-			if m.dash.businesses.page == pageList {
-				m.dash.businesses.page = pageCreate
-				m.dash.businesses.ideaInput = ""
-			}
-		case "r":
-			if m.dash.businesses.page == pageList {
-				m.dash.businesses.loading = true
-				return m.loadBusinesses()
-			}
-		case "backspace":
-			if m.dash.businesses.page == pageCreate && len(m.dash.businesses.ideaInput) > 0 {
-				m.dash.businesses.ideaInput = m.dash.businesses.ideaInput[:len(m.dash.businesses.ideaInput)-1]
-			}
-		}
-
-		if m.dash.businesses.page == pageCreate {
-			switch msg.String() {
-			case "enter":
-				if !m.dash.businesses.creating && len(m.dash.businesses.ideaInput) > 0 {
-					m.dash.businesses.creating = true
-					return m.createBusiness(m.dash.businesses.ideaInput)
-				}
-			default:
-				if len(msg.String()) == 1 && msg.String() != "n" && msg.String() != "r" && msg.String() != "esc" {
-					m.dash.businesses.ideaInput += msg.String()
-				}
-			}
-		}
+	switch m.dash.businesses.page {
+	case pageList:
+		return m.updateBusinessList(msg)
+	case pageCreate:
+		return m.updateBusinessCreate(msg)
+	case pageDetail:
+		return m.updateBusinessDetail(msg)
 	}
-
 	return nil
 }
 
-func (m *model) loadBusinessDetail(id int) tea.Cmd {
-	m.dash.businesses.loading = true
+func (m *model) updateBusinessList(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "up", "k":
+			if m.dash.businesses.selected > 0 {
+				m.dash.businesses.selected--
+			}
+		case "down", "j":
+			if m.dash.businesses.selected < len(m.dash.businesses.businesses)-1 {
+				m.dash.businesses.selected++
+			}
+		case "enter":
+			if len(m.dash.businesses.businesses) > 0 {
+				m.dash.businesses.page = pageDetail
+			}
+		case "n":
+			m.dash.businesses.page = pageCreate
+			m.dash.businesses.ideaInput = ""
+		case "r":
+			m.dash.businesses.loading = true
+			return m.loadBusinesses()
+		}
+	}
+	return nil
+}
+
+func (m *model) updateBusinessCreate(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "enter":
+			if m.dash.businesses.ideaInput != "" {
+				m.dash.businesses.creating = true
+				return m.createBusiness()
+			}
+		case "backspace":
+			if len(m.dash.businesses.ideaInput) > 0 {
+				m.dash.businesses.ideaInput = m.dash.businesses.ideaInput[:len(m.dash.businesses.ideaInput)-1]
+			}
+		case "esc":
+			m.dash.businesses.page = pageList
+		default:
+			if len(msg.String()) == 1 {
+				m.dash.businesses.ideaInput += msg.String()
+			}
+		}
+	}
+	return nil
+}
+
+func (m *model) updateBusinessDetail(msg tea.Msg) tea.Cmd {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "esc", "q", "backspace":
+			m.dash.businesses.page = pageList
+		}
+	}
+	return nil
+}
+
+func (m *model) createBusiness() tea.Cmd {
 	return func() tea.Msg {
-		b, err := m.api.getBusiness(id)
+		b, err := m.api.createBusiness(m.dash.businesses.ideaInput)
 		if err != nil {
 			return errMsg{err}
 		}
-		m.dash.businesses.detail = b
-		m.dash.businesses.page = pageDetail
-		m.dash.businesses.loading = false
-		return nil
+		return businessCreatedMsg{business: b}
 	}
 }
 
-func (m *model) createBusiness(idea string) tea.Cmd {
-	return func() tea.Msg {
-		b, err := m.api.createBusiness(idea)
-		if err != nil {
-			m.dash.businesses.creating = false
-			return errMsg{err}
-		}
-		return businessCreatedMsg{b}
-	}
-}
-
-func (m model) businessesView() string {
-	var b strings.Builder
-
+func (m *model) businessesView() string {
 	switch m.dash.businesses.page {
-	case pageList:
-		b.WriteString(titleStyle.Render("Businesses"))
-		b.WriteString("\n\n")
-		b.WriteString(m.businessListView())
-	case pageDetail:
-		b.WriteString(m.businessDetailView())
 	case pageCreate:
-		b.WriteString(m.businessCreateView())
+		return m.createBusinessView()
+	case pageDetail:
+		return m.businessDetailView()
+	default:
+		return m.businessListView()
 	}
-
-	return b.String()
 }
 
-func (m model) businessListView() string {
+func (m *model) businessListView() string {
 	var b strings.Builder
+
+	b.WriteString(titleStyle.Render("Businesses"))
+	b.WriteString("\n\n")
 
 	if m.dash.businesses.loading {
-		b.WriteString(spinnerStyle.Render("Loading businesses..."))
+		b.WriteString(infoStyle.Render("Loading..."))
 		return b.String()
 	}
 
 	if len(m.dash.businesses.businesses) == 0 {
-		b.WriteString(subtitleStyle.Render("No businesses yet. Press 'n' to create one."))
+		b.WriteString(dimStyle.Render("No businesses yet. Press 'n' to create one."))
 		b.WriteString("\n\n")
-		b.WriteString(helpStyle.Render("n: create business • r: refresh • q: quit"))
+		b.WriteString(helpStyle.Render("n: new • r: refresh • q: quit"))
 		return b.String()
 	}
 
 	for i, biz := range m.dash.businesses.businesses {
-		statusColor := special
-		if biz.Status == "failed" || biz.Status == "error" {
-			statusColor = warn
-		} else if biz.Status == "in_progress" || biz.Status == "building" {
-			statusColor = info
-		}
-
-		line := fmt.Sprintf("%s  %s  (%s)",
-			statusStyle.Copy().BorderForeground(statusColor).Foreground(statusColor).Render(biz.Status),
-			biz.Name,
-			biz.CreatedAt[:10],
-		)
-
+		prefix := "  "
 		if i == m.dash.businesses.selected {
-			b.WriteString(selectedItemStyle.Render("▸ " + line))
+			prefix = "▸ "
+		}
+		line := fmt.Sprintf("%s%s  %s", prefix, biz.Name, dimStyle.Render(biz.Status))
+		if i == m.dash.businesses.selected {
+			b.WriteString(selectedStyle.Render(line))
 		} else {
-			b.WriteString(itemStyle.Render("  " + line))
+			b.WriteString(line)
 		}
 		b.WriteString("\n")
 	}
 
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("↑/↓: navigate • enter: detail • n: create • r: refresh • q: quit"))
-
+	b.WriteString(helpStyle.Render("↑↓: navigate • enter: detail • n: new • r: refresh • q: quit"))
 	return b.String()
 }
 
-func (m model) businessDetailView() string {
+func (m *model) createBusinessView() string {
 	var b strings.Builder
-	d := m.dash.businesses.detail
 
-	b.WriteString(titleStyle.Render(d.Name))
+	b.WriteString(titleStyle.Render("New Business"))
 	b.WriteString("\n\n")
-
-	statusColor := special
-	switch d.Status {
-	case "failed", "error":
-		statusColor = warn
-	case "in_progress", "building":
-		statusColor = info
-	}
-	b.WriteString(statusStyle.Copy().BorderForeground(statusColor).Foreground(statusColor).Render("Status: " + d.Status))
-	b.WriteString("\n\n")
-
-	b.WriteString(detailStyle.Render(
-		lipgloss.JoinVertical(lipgloss.Left,
-			"Idea: "+d.Idea,
-			"",
-			"Description: "+d.Description,
-			"",
-			fmt.Sprintf("Progress: %d%%", d.Progress),
-			"",
-			"Created: "+d.CreatedAt,
-			"Updated: "+d.UpdatedAt,
-		),
-	))
-	b.WriteString("\n\n")
-
-	if len(d.Agents) > 0 {
-		b.WriteString(subtitleStyle.Render("Agent Status"))
-		b.WriteString("\n")
-		for _, agent := range d.Agents {
-			agColor := subtle
-			switch agent.Status {
-			case "completed", "success":
-				agColor = special
-			case "in_progress", "running":
-				agColor = info
-			case "failed", "error":
-				agColor = warn
-			}
-			b.WriteString(itemStyle.Copy().Foreground(agColor).Render("  • " + agent.Name + ": " + agent.Status))
-			b.WriteString("\n")
-		}
-	}
-
+	b.WriteString(inputStyle.Render("Describe your business idea:"))
 	b.WriteString("\n")
-	b.WriteString(helpStyle.Render("esc: back • q: quit"))
-
-	return b.String()
-}
-
-func (m model) businessCreateView() string {
-	var b strings.Builder
-
-	b.WriteString(titleStyle.Render("Create New Business"))
-	b.WriteString("\n\n")
-	b.WriteString(subtitleStyle.Render("Enter your business idea below:"))
-	b.WriteString("\n\n")
-
-	inputBorder := subtle
-	if m.dash.businesses.page == pageCreate {
-		inputBorder = highlight
-	}
-
-	inputBox := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), true, true, true, true).
-		BorderForeground(inputBorder).
-		Width(50).
-		Height(3).
-		Padding(0, 1).
-		Render(m.dash.businesses.ideaInput + "█")
-
-	b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Render(inputBox))
+	b.WriteString(valueStyle.Render(m.dash.businesses.ideaInput + cursor()))
 	b.WriteString("\n\n")
 
 	if m.dash.businesses.creating {
-		b.WriteString(spinnerStyle.Render("Creating business..."))
+		b.WriteString(infoStyle.Render("Creating..."))
 	} else {
-		b.WriteString(lipgloss.NewStyle().PaddingLeft(2).Render(
-			"[ Press enter to submit ]",
-		))
+		b.WriteString(helpStyle.Render("Enter: create • Esc: back"))
 	}
 
-	b.WriteString("\n\n")
-	b.WriteString(helpStyle.Render("type: enter idea • enter: submit • esc: back"))
+	return b.String()
+}
 
+func (m *model) businessDetailView() string {
+	if len(m.dash.businesses.businesses) == 0 {
+		return ""
+	}
+	biz := m.dash.businesses.businesses[m.dash.businesses.selected]
+
+	var b strings.Builder
+	b.WriteString(titleStyle.Render(biz.Name))
+	b.WriteString("\n\n")
+
+	info := []struct{ label, value string }{
+		{"ID", biz.ID},
+		{"Status", biz.Status},
+		{"Phase", biz.CurrentPhase},
+		{"Created", biz.CreatedAt},
+	}
+	for _, item := range info {
+		b.WriteString(fmt.Sprintf("%s: %s\n", labelStyle.Render(item.label), valueStyle.Render(item.value[:min(len(item.value), 36)])))
+	}
+
+	b.WriteString("\n")
+	b.WriteString(helpStyle.Render("Esc: back"))
 	return b.String()
 }

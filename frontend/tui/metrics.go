@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 func (m *model) updateMetrics(msg tea.Msg) tea.Cmd {
@@ -20,70 +19,32 @@ func (m *model) updateMetrics(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-func (m model) metricsView() string {
+func (m *model) metricsView() string {
 	var b strings.Builder
 
 	b.WriteString(titleStyle.Render("Metrics"))
 	b.WriteString("\n\n")
 
 	if m.dash.metrics.loading {
-		b.WriteString(spinnerStyle.Render("Loading metrics..."))
+		b.WriteString(infoStyle.Render("Loading..."))
 		return b.String()
 	}
 
 	if len(m.dash.metrics.metrics) == 0 {
-		b.WriteString(subtitleStyle.Render("No metrics available yet."))
+		b.WriteString(dimStyle.Render("No metrics data yet."))
 		b.WriteString("\n\n")
 		b.WriteString(helpStyle.Render("r: refresh • q: quit"))
 		return b.String()
 	}
 
-	metricsByBusiness := make(map[int][]metricSnapshot)
-	for _, m := range m.dash.metrics.metrics {
-		metricsByBusiness[m.BusinessID] = append(metricsByBusiness[m.BusinessID], m)
+	for _, mt := range m.dash.metrics.metrics {
+		b.WriteString(fmt.Sprintf("  %s\n", labelStyle.Render(mt.RecordedByRole)))
+		b.WriteString(fmt.Sprintf("    Revenue:    $%.2f\n", mt.DailyRevenue))
+		b.WriteString(fmt.Sprintf("    Users:      %d\n", mt.UsersCount))
+		b.WriteString(fmt.Sprintf("    Churn Rate: %.1f%%\n", mt.ChurnRate*100))
+		b.WriteString(fmt.Sprintf("    %s\n\n", dimStyle.Render(mt.CreatedAt)))
 	}
 
-	for bizID, ms := range metricsByBusiness {
-		bizName := fmt.Sprintf("Business #%d", bizID)
-		for _, biz := range m.dash.businesses.businesses {
-			if biz.ID == bizID {
-				bizName = biz.Name
-				break
-			}
-		}
-
-		b.WriteString(subtitleStyle.Render(bizName))
-		b.WriteString("\n")
-
-		for _, metric := range ms {
-			valColor := special
-			if metric.Value < 0 {
-				valColor = warn
-			}
-
-			card := lipgloss.NewStyle().
-				Width(25).
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(subtle).
-				Padding(0, 1).
-				MarginRight(1).
-				MarginBottom(1).
-				Render(
-					lipgloss.JoinVertical(lipgloss.Center,
-						metric.Name,
-						lipgloss.NewStyle().Bold(true).Foreground(valColor).Render(
-							fmt.Sprintf("%.1f %s", metric.Value, metric.Unit),
-						),
-					),
-				)
-
-			b.WriteString(card)
-		}
-		b.WriteString("\n")
-	}
-
-	b.WriteString("\n")
 	b.WriteString(helpStyle.Render("r: refresh • q: quit"))
-
 	return b.String()
 }

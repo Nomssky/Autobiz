@@ -34,7 +34,6 @@ type businessListModel struct {
 	page        page
 	businesses  []business
 	selected    int
-	detail      businessDetail
 	loading     bool
 	err         string
 	ideaInput   string
@@ -47,7 +46,6 @@ type approvalListModel struct {
 	selected    int
 	loading     bool
 	err         string
-	detail      approvalRequest
 	showDetails bool
 }
 
@@ -104,7 +102,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 
-		if m.state == stateLogin || m.state == stateRegister {
+		if m.state == stateLogin {
 			return m.handleAuthKey(msg)
 		}
 		return m.handleDashKey(msg)
@@ -112,7 +110,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case loggedInMsg:
 		m.user = msg.user
 		m.state = stateDashboard
-		m.api.setToken(msg.user.Token)
+		m.api.setToken(msg.user.AccessToken)
 		cmds = append(cmds, m.loadDashboardData())
 
 	case errMsg:
@@ -140,6 +138,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.dash.metrics.metrics = msg.metrics
 		m.dash.metrics.loading = false
 
+	case successMsg:
+		m.err = ""
+		return m, m.loadDashboardData()
+
 	default:
 		if m.state == stateLogin || m.state == stateRegister {
 			var cmd tea.Cmd
@@ -157,24 +159,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) handleAuthKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
-
-	switch msg.String() {
-	case "r":
-		m.state = stateRegister
-		m.auth.state = stateRegister
-		m.auth.err = ""
-		m.auth.focusIndex = 0
-		m.auth.updateFocus()
-	case "l":
-		m.state = stateLogin
-		m.auth.state = stateLogin
-		m.auth.err = ""
-		m.auth.focusIndex = 0
-		m.auth.updateFocus()
-	default:
-		m.auth, cmd = m.auth.Update(msg)
-	}
-
+	m.auth, cmd = m.auth.Update(msg)
 	return m, cmd
 }
 
@@ -359,7 +344,7 @@ func (m model) dashboardContentView() string {
 	b.WriteString("\n\n")
 
 	if approvalCount > 0 {
-		b.WriteString(warnStyle().Render(fmt.Sprintf("⚠ %d pending approval(s) — switch to Approvals tab", approvalCount)))
+		b.WriteString(warnStyle.Render(fmt.Sprintf("⚠ %d pending approval(s) — switch to Approvals tab", approvalCount)))
 		b.WriteString("\n\n")
 	}
 
@@ -383,8 +368,4 @@ func (m model) statCard(label, value string, color lipgloss.AdaptiveColor) strin
 			label,
 		),
 	)
-}
-
-func warnStyle() lipgloss.Style {
-	return lipgloss.NewStyle().Foreground(warn).Bold(true)
 }
