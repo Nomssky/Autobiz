@@ -1,0 +1,295 @@
+/* AutoBiz TUI — opencode/claude dark mode inspired */
+
+Screen {
+    background: #0a0e27;
+    color: #e2e8f0;
+}
+
+/* ─── Top Bar ─────────────────────────── */
+.top-bar {
+    background: #1e293b;
+    height: 1;
+    padding: 0 2;
+    color: #94a3b8;
+}
+
+/* ─── Auth Screen ─────────────────────── */
+#auth-screen {
+    align: center middle;
+}
+
+.auth-box {
+    width: 60;
+    height: auto;
+    border: solid #6366f1;
+    padding: 2 4;
+    background: #1e293b;
+}
+
+.auth-title {
+    text-style: bold;
+    color: #6366f1;
+    text-align: center;
+    margin: 1 0;
+}
+
+.auth-subtitle {
+    color: #94a3b8;
+    text-align: center;
+    margin: 0 0 2 0;
+}
+
+#token-input {
+    margin: 1 0;
+}
+
+#login-btn {
+    width: 100%;
+    margin: 1 0;
+}
+
+#auth-status {
+    text-align: center;
+    margin: 1 0;
+    color: #ef4444;
+}
+
+/* ─── Dashboard Screen ─────────────────── */
+#dashboard-screen {
+    padding: 0 1;
+}
+
+/* Header bar */
+.header-bar {
+    background: #1e293b;
+    height: 3;
+    padding: 0 2;
+}
+
+.header-logo {
+    color: #6366f1;
+    text-style: bold;
+}
+
+.header-model {
+    color: #94a3b8;
+    text-align: right;
+}
+
+.header-greeting {
+    color: #94a3b8;
+}
+
+/* Stats row */
+#stats-grid {
+    layout: grid;
+    grid-size: 4;
+    grid-gutter: 1;
+    margin: 1 0;
+}
+
+.stat-card {
+    background: #1e293b;
+    border: solid #334155;
+    padding: 1 2;
+    height: 5;
+}
+
+.stat-num {
+    text-style: bold;
+    color: #e2e8f0;
+    text-align: center;
+}
+
+.stat-label {
+    color: #64748b;
+    text-align: center;
+}
+
+.stat-card.warn .stat-num {
+    color: #f59e0b;
+}
+
+.stat-card.warn {
+    border: solid #f59e0b;
+}
+
+/* Loading */
+#loading {
+    color: #64748b;
+    margin: 1 0;
+    text-align: center;
+}
+
+/* Agent section */
+.section-title {
+    text-style: bold;
+    color: #a5b4fc;
+    margin: 1 0 1 0;
+}
+
+#agent-list {
+    height: auto;
+    max-height: 20;
+    margin: 0 0 1 0;
+}
+
+.agent-row {
+    height: 3;
+    border: none;
+    padding: 0 1;
+}
+
+.agent-row:hover {
+    background: #1e293b;
+}
+
+.agent-row.selected {
+    background: #1a1f3a;
+}
+
+.agent-icon {
+    width: 3;
+}
+
+.agent-name {
+    width: 22;
+}
+
+.agent-tier-info {
+    width: 30;
+    color: #64748b;
+}
+
+.agent-status-dot {
+    width: 2;
+    text-align: center;
+}
+
+/* ─── Bottom Nav ──────────────────────── */
+.bottom-bar {
+    background: #1e293b;
+    height: 1;
+    padding: 0 2;
+    dock: bottom;
+}
+
+.nav-hint {
+    color: #64748b;
+}
+
+.nav-key {
+    color: #6366f1;
+    text-style: bold;
+}
+
+/* ─── Detail Screen ───────────────────── */
+.detail-card {
+    background: #1e293b;
+    border: solid #334155;
+    padding: 1 2;
+    margin: 0 0 1 0;
+}
+
+.detail-title {
+    text-style: bold;
+    color: #e2e8f0;
+}
+
+.detail-desc {
+    color: #94a3b8;
+}
+
+.detail-row {
+    padding: 0 0 0 1;
+    height: 1;
+}
+
+.detail-label {
+    color: #64748b;
+    width: 14;
+}
+
+.detail-value {
+    color: #e2e8f0;
+}
+
+.detail-warning {
+    color: #f59e0b;
+}
+
+.config-box {
+    background: #0f172a;
+    border: solid #334155;
+    padding: 1 2;
+    margin: 1 0;
+}
+
+.config-row {
+    height: 3;
+    padding: 0 0;
+}
+
+.config-label {
+    color: #94a3b8;
+    width: 14;
+}
+
+/* ─── Back button ─────────────────────── */
+.back-bar {
+    height: 3;
+    padding: 0 1;
+}
+
+.back-btn {
+    width: 12;
+}
+
+/* ─── Buttons ─────────────────────────── */
+Button {
+    background: #6366f1;
+    color: #ffffff;
+    border: none;
+    text-style: bold;
+    min-width: 16;
+    height: 3;
+    padding: 0 2;
+}
+
+Button:hover {
+    background: #818cf8;
+}
+
+Button.success {
+    background: #10b981;
+}
+
+Button.success:hover {
+    background: #34d399;
+}
+
+/* ─── Inputs ──────────────────────────── */
+Input {
+    background: #0f172a;
+    color: #e2e8f0;
+    border: solid #475569;
+    padding: 0 2;
+    height: 3;
+}
+
+Input:focus {
+    border: solid #6366f1;
+}
+
+/* ─── Scrollable ───────────────────────── */
+ScrollableContainer {
+    background: transparent;
+}
+
+/* ─── Static text helpers ──────────────── */
+.text-error { color: #ef4444; }
+.text-warning { color: #f59e0b; }
+.text-success { color: #10b981; }
+.text-muted { color: #64748b; }
+.text-brand { color: #6366f1; }
+.text-bold { text-style: bold; }
