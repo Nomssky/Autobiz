@@ -45,7 +45,7 @@ New-Item -ItemType Directory -Force -Path $binDir | Out-Null
 
 # ─── Download project ────────────────────────────
 Write-Host "  ℹ Downloading AutoBiz..." -ForegroundColor DarkGray
-$repo = "https://github.com/autobiz/autobiz-engine.git"
+$repo = "https://github.com/Nomssky/Autobiz.git"
 if (Test-Path "$appDir\.git") {
   Push-Location $appDir; git pull --ff-only 2>$null; Pop-Location
 } else {

@@ -63,7 +63,7 @@ mkdir -p "$APP_DIR" "$BIN_DIR"
 
 # ─── Download project ────────────────────────────
 info "Downloading AutoBiz..."
-REPO="https://github.com/autobiz/autobiz-engine.git"
+REPO="https://github.com/Nomssky/Autobiz.git"
 if [ -d "$APP_DIR/.git" ]; then
   cd "$APP_DIR" && git pull --ff-only 2>/dev/null || true
 else
