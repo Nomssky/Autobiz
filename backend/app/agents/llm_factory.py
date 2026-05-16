@@ -209,7 +209,7 @@ def create_embeddings(
     """
     provider = (provider or settings.EMBEDDING_PROVIDER or "openai").lower()
     api_key = api_key or settings.EMBEDDING_API_KEY or settings.LLM_API_KEY or settings.OPENAI_API_KEY or ""
-    model = model or settings.EMBEDDING_MODEL or settings.OPENAI_EMBEDDING_MODEL or "text-embedding-3-small"
+    model = model or settings.EMBEDDING_MODEL or "text-embedding-3-small"
     base_url = base_url or settings.EMBEDDING_BASE_URL or ""
 
     logger.info(f"Generating embedding: provider={provider}, model={model}")

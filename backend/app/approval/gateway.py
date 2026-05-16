@@ -92,7 +92,7 @@ class ApprovalGateway:
             # Update approval record
             approval.status = "approved" if decision == "approve" else "rejected"
             approval.decided_by_ceo_id = ceo_id
-            approval.ceo_decision = comments
+            approval.ceo_comments = comments
             approval.decided_at = datetime.utcnow()
 
             # Update associated task

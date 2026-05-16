@@ -2,10 +2,10 @@
 Business-related background tasks (Celery workers).
 """
 
-from celery import current_app
+from app.workers.celery_app import celery_app
 
 
-@current_app.task(bind=True, max_retries=3, default_retry_delay=60)
+@celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 def process_business_creation(self, business_data: dict):
     """
     Process business creation asynchronously.
@@ -38,7 +38,7 @@ def process_business_creation(self, business_data: dict):
         raise self.retry(exc=exc)
 
 
-@current_app.task(bind=True, max_retries=2)
+@celery_app.task(bind=True, max_retries=2)
 def update_business_metrics(self, business_id: str):
     """
     Refresh metrics for a business.

@@ -142,7 +142,7 @@ def decide_approval(
 
     now = datetime.utcnow()
     approval.status = decision.decision.value
-    approval.ceo_decision = decision.comments
+    approval.ceo_comments = decision.comments
     approval.decided_by_ceo_id = ceo_id
     approval.decided_at = now
     approval.updated_at = now

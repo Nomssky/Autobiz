@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from uuid import UUID
 
@@ -18,8 +19,6 @@ class BuildTask(Task):
         if business_id:
             notifier = ApprovalNotifier()
             try:
-                import asyncio
-
                 asyncio.run(
                     notifier.send_system_alert(
                         "build_failure",
@@ -27,24 +26,24 @@ class BuildTask(Task):
                         severity="critical",
                     )
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Build failure notification failed: {e}")
 
 
 @celery_app.task(bind=True, base=BuildTask, name="build_tasks.build_business")
-async def build_business(self, business_id: str, idea: str):
-    """Celery task for building a business from an idea"""
-
+def build_business(self, business_id: str, idea: str):
     logger.info(f"Starting build task for business {business_id}")
 
-    try:
+    async def _run():
         phase_manager = PhaseManager(UUID(business_id))
         await phase_manager.initialize_agents()
-        result = await phase_manager.execute_build_phase(idea)
+        return await phase_manager.execute_build_phase(idea)
+
+    try:
+        result = asyncio.run(_run())
 
         if result["success"]:
             logger.info(f"Build completed for {business_id}")
-            # Start operate phase as a separate task
             operate_business.delay(business_id)
         else:
             logger.error(f"Build failed for {business_id}: {result.get('error')}")
@@ -63,15 +62,16 @@ async def build_business(self, business_id: str, idea: str):
 
 
 @celery_app.task(bind=True, base=BuildTask, name="build_tasks.operate_business")
-async def operate_business(self, business_id: str):
-    """Celery task for starting the operate phase"""
-
+def operate_business(self, business_id: str):
     logger.info(f"Starting operate phase for {business_id}")
 
-    try:
+    async def _run():
         phase_manager = PhaseManager(UUID(business_id))
         await phase_manager.initialize_agents()
-        result = await phase_manager.execute_operate_phase()
+        return await phase_manager.execute_operate_phase()
+
+    try:
+        result = asyncio.run(_run())
 
         return {
             "status": "operating",
@@ -85,15 +85,13 @@ async def operate_business(self, business_id: str):
 
 
 @celery_app.task(name="build_tasks.process_phase_approvals")
-async def process_phase_approvals(business_id: str):
-    """Process any pending approvals for a business"""
-
+def process_phase_approvals(business_id: str):
     from app.approval.gateway import approval_gateway
 
     logger.info(f"Processing approvals for business {business_id}")
 
     try:
-        await approval_gateway.auto_handle_routine(UUID(business_id))
+        asyncio.run(approval_gateway.auto_handle_routine(UUID(business_id)))
         return {"status": "completed", "business_id": business_id}
     except Exception as exc:
         logger.error(f"Approval processing failed for {business_id}: {exc}")

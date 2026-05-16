@@ -47,14 +47,10 @@ class FinanceAgent(BaseAgent):
             return await self._setup_pricing_and_payments(input_data)
         elif task_type == "setup_pricing":
             return await self._setup_pricing(input_data)
-        elif task_type == "setup_stripe_payments":
-            return await self._setup_stripe_payments(input_data)
         elif task_type == "track_revenue":
             return await self._track_revenue(input_data)
         elif task_type == "calculate_unit_economics":
             return await self._calculate_unit_economics(input_data)
-        elif task_type == "create_invoice":
-            return await self._create_invoice(input_data)
         elif task_type == "generate_financial_projection":
             return await self._generate_financial_projection(input_data)
         elif task_type == "get_current_metrics":
@@ -108,53 +104,8 @@ Return JSON with pricing_tiers array of {{name, price, currency, billing_cycle, 
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
-    async def _setup_stripe_payments(self, params: Dict[str, Any]) -> AgentResult:
-        stripe_key = settings.STRIPE_API_KEY or ""
-        if not stripe_key or stripe_key == "your-stripe-api-key":
-            return AgentResult(
-                success=False,
-                output=None,
-                error="Stripe API key not configured. Set STRIPE_API_KEY in .env",
-            )
-        try:
-            import stripe
-            stripe.api_key = stripe_key
-            account = stripe.Account.retrieve()
-            return AgentResult(
-                success=True,
-                output={
-                    "stripe_mode": "live",
-                    "account_id": account.id,
-                    "account_configured": True,
-                    "payouts_enabled": account.payouts_enabled,
-                },
-                requires_approval=False,
-            )
-        except ImportError:
-            return AgentResult(
-                success=False,
-                output=None,
-                error="Stripe library not installed. Run: pip install stripe",
-            )
-        except Exception as e:
-            return AgentResult(success=False, output=None, error=f"Stripe API error: {e}")
 
-    async def _track_revenue(self, params: Dict[str, Any]) -> AgentResult:
-        prompt = f"""Analyze revenue for period: {params.get('period', 'monthly')}
-Segment by: {params.get('segment_by', 'plan')}
 
-Return JSON with metrics: {{mrr, arr, new_revenue, churned_revenue, total_customers, avg_revenue_per_user, revenue_growth_rate}}"""
-        try:
-            response = await self.llm.ainvoke(prompt, system_prompt="You are a revenue analyst.")
-            output = json.loads(response)
-            return AgentResult(
-                success=True,
-                output=output,
-                requires_approval=False,
-                tokens_used=getattr(self.llm, "last_token_usage", {}),
-            )
-        except Exception as e:
-            return AgentResult(success=False, output=None, error=str(e))
 
     async def _calculate_unit_economics(self, params: Dict[str, Any]) -> AgentResult:
         prompt = f"""Calculate unit economics:
@@ -171,56 +122,7 @@ Return JSON with: {{cac, ltv, ltv_to_cac_ratio, payback_months, gross_margin, he
         except Exception as e:
             return AgentResult(success=False, output=None, error=str(e))
 
-    async def _create_invoice(self, params: Dict[str, Any]) -> AgentResult:
-        stripe_key = settings.STRIPE_API_KEY or ""
-        if not stripe_key or stripe_key == "your-stripe-api-key":
-            return AgentResult(
-                success=False,
-                output=None,
-                error="Stripe API key not configured. Set STRIPE_API_KEY in .env",
-            )
-        if not params.get("customer_id"):
-            return AgentResult(
-                success=False,
-                output=None,
-                error="customer_id is required to create an invoice",
-            )
-        try:
-            import stripe
-            stripe.api_key = stripe_key
-            customer = stripe.Customer.retrieve(params["customer_id"])
-            invoice = stripe.Invoice.create(
-                customer=customer.id,
-                collection_method="charge_automatically",
-                days_until_due=30,
-            )
-            stripe.InvoiceItem.create(
-                customer=customer.id,
-                invoice=invoice.id,
-                amount=int(float(params.get("amount", 0)) * 100),
-                currency="usd",
-            )
-            invoice.finalize_invoice()
-            return AgentResult(
-                success=True,
-                output={
-                    "invoice_id": invoice.id,
-                    "customer_id": customer.id,
-                    "amount": params.get("amount", 0),
-                    "status": invoice.status,
-                    "invoice_url": invoice.hosted_invoice_url,
-                    "stripe_mode": "live",
-                },
-                requires_approval=False,
-            )
-        except ImportError:
-            return AgentResult(
-                success=False,
-                output=None,
-                error="Stripe library not installed. Run: pip install stripe",
-            )
-        except Exception as e:
-            return AgentResult(success=False, output=None, error=f"Stripe invoice error: {e}")
+
 
     async def _generate_financial_projection(self, params: Dict[str, Any]) -> AgentResult:
         prompt = f"""Generate 12-month financial projections:

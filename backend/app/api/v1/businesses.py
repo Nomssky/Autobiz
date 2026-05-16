@@ -1,8 +1,10 @@
+import logging
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
 from app.api.dependencies import get_db_session, require_ceo
+from app.config import settings
 from app.models.agent_task import AgentTask
 from app.models.business import Business
 from app.orchestrator.build_pipeline import run_build_pipeline
@@ -11,21 +13,35 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
 
+logger = logging.getLogger(__name__)
+
 
 def _check_ownership(business: Business, ceo_id: UUID):
-    """Check if the CEO owns the business, handling type differences (UUID vs str)."""
     if str(business.ceo_id) != str(ceo_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only the business owner can perform this action",
         )
 
+
+def _validate_llm_config():
+    provider = (settings.LLM_PROVIDER or "").lower()
+    has_api_key = bool(settings.LLM_API_KEY or settings.OPENAI_API_KEY)
+    if provider != "ollama" and not has_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "LLM is not configured. Set LLM_API_KEY in Settings or "
+                "switch to LLM_PROVIDER=ollama for local models."
+            ),
+        )
+
+
 router = APIRouter(prefix="/businesses", tags=["businesses"])
 
 
 @router.post(
     "/create",
-    response_model=BusinessResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Create a new business",
 )
@@ -35,6 +51,8 @@ def create_business(
     ceo_id: UUID = Depends(require_ceo),
 ):
     """Create a new business from an idea and trigger the build pipeline."""
+    _validate_llm_config()
+
     business = Business(
         name=request.idea[:255],
         description=request.idea,
@@ -47,16 +65,30 @@ def create_business(
     db.flush()
     db.refresh(business)
 
-    # Run build pipeline (creates tasks + approval requests)
     try:
         pipeline_result = run_build_pipeline(business.id, request.idea, db, ceo_id)
-        business.current_phase = pipeline_result.get("final_phase", "planning")
-    except Exception:
+        business.current_phase = pipeline_result.get("final_phase", "tasks_created")
+        business.updated_at = datetime.utcnow()
+        db.flush()
+    except Exception as e:
         business.status = "failed"
+        business.updated_at = datetime.utcnow()
+        db.flush()
+        logger.error(f"Pipeline failed for business {business.id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Pipeline gagal: {str(e)}",
+        )
 
-    business.updated_at = datetime.utcnow()
-    db.flush()
-    return BusinessResponse.model_validate(business)
+    # Agent warnings berdasarkan model saat ini
+    from app.agents.registry import check_warnings, classify_model
+    model_name = settings.LLM_MODEL or settings.OPENAI_MODEL or ""
+    model_info = classify_model(model_name) if model_name else {"tier": "unknown"}
+    warnings = check_warnings({}, model_info.get("tier", "unknown"))
+
+    response = BusinessResponse.model_validate(business).model_dump()
+    response["agent_warnings"] = warnings
+    return response
 
 
 @router.get(

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AutoBiz Dashboard</title>
+<link rel="stylesheet" href="/ui/static/style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">🏢 AutoBiz</div>
+    <div class="header-right">
+      <span class="model-badge" id="model-badge">—</span>
+      <span class="status-dot" id="status-dot"></span>
+    </div>
+  </header>
+
+  <div class="greeting" id="greeting">Selamat datang!</div>
+
+  <div class="stats-row">
+    <div class="stat-card"><span class="stat-num" id="stat-biz">0</span><span class="stat-label">Bisnis</span></div>
+    <div class="stat-card"><span class="stat-num" id="stat-active">0</span><span class="stat-label">Aktif</span></div>
+    <div class="stat-card"><span class="stat-num" id="stat-pending">0</span><span class="stat-label">Keputusan</span></div>
+    <div class="stat-card warn" id="stat-warn"><span class="stat-num">0</span><span class="stat-label">⚠ Agent</span></div>
+  </div>
+
+  <div class="office" id="office-grid">
+    <div class="agent-card" data-agent="researcher" onclick="openDetail('researcher')">
+      <div class="agent-emoji">📊</div>
+      <div class="agent-name">Market Researcher</div>
+      <div class="agent-status-row"><span class="dot" id="dot-researcher"></span><span class="agent-task" id="task-researcher">—</span></div>
+      <div class="agent-tier" id="tier-researcher">—</div>
+    </div>
+    <div class="agent-card" data-agent="developer" onclick="openDetail('developer')">
+      <div class="agent-emoji">💻</div>
+      <div class="agent-name">Software Engineer</div>
+      <div class="agent-status-row"><span class="dot" id="dot-developer"></span><span class="agent-task" id="task-developer">—</span></div>
+      <div class="agent-tier" id="tier-developer">—</div>
+    </div>
+    <div class="agent-card" data-agent="designer" onclick="openDetail('designer')">
+      <div class="agent-emoji">🎨</div>
+      <div class="agent-name">Brand Designer</div>
+      <div class="agent-status-row"><span class="dot" id="dot-designer"></span><span class="agent-task" id="task-designer">—</span></div>
+      <div class="agent-tier" id="tier-designer">—</div>
+    </div>
+    <div class="agent-card" data-agent="marketer" onclick="openDetail('marketer')">
+      <div class="agent-emoji">📣</div>
+      <div class="agent-name">Marketing</div>
+      <div class="agent-status-row"><span class="dot" id="dot-marketer"></span><span class="agent-task" id="task-marketer">—</span></div>
+      <div class="agent-tier" id="tier-marketer">—</div>
+    </div>
+    <div class="agent-card" data-agent="finance" onclick="openDetail('finance')">
+      <div class="agent-emoji">💰</div>
+      <div class="agent-name">Finance</div>
+      <div class="agent-status-row"><span class="dot" id="dot-finance"></span><span class="agent-task" id="task-finance">—</span></div>
+      <div class="agent-tier" id="tier-finance">—</div>
+    </div>
+    <div class="agent-card" data-agent="support" onclick="openDetail('support')">
+      <div class="agent-emoji">🎧</div>
+      <div class="agent-name">Support</div>
+      <div class="agent-status-row"><span class="dot" id="dot-support"></span><span class="agent-task" id="task-support">—</span></div>
+      <div class="agent-tier" id="tier-support">—</div>
+    </div>
+  </div>
+
+  <div class="activity-section">
+    <div class="section-title">📋 Live Activity</div>
+    <div class="activity-log" id="activity-log">
+      <div class="log-empty">Memuat...</div>
+    </div>
+  </div>
+
+  <div class="nav-bar">
+    <span class="nav-key active" data-tab="dashboard" onclick="switchTab('dashboard')">1 Dashboard</span>
+    <span class="nav-key" data-tab="detail" onclick="switchTab('detail')">2 Detail</span>
+    <span class="nav-key" data-tab="agents" onclick="switchTab('agents')">3 Agents</span>
+    <span class="nav-key" id="nav-quit">Q Quit</span>
+  </div>
+</div>
+<script src="/ui/static/app.js"></script>
+</body>
+</html>

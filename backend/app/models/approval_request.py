@@ -16,7 +16,7 @@ class ApprovalRequest(BaseModel):
     status = Column(
         String(50), nullable=False, default="pending"
     )  # pending, approved, rejected, expired
-    ceo_decision = Column(Text, nullable=True)
+    ceo_comments = Column(Text, nullable=True)
     decided_by_ceo_id = Column(GUID(), nullable=True)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     decided_at = Column(DateTime(timezone=True), nullable=True)

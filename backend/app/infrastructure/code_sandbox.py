@@ -155,8 +155,8 @@ class CodeSandbox:
                 exit_code = wait_result["StatusCode"] if isinstance(wait_result, dict) else wait_result
                 duration_ms = int((time.time() - start_time) * 1000)
                 timeout_occurred = False
-            except Exception:
-                # Timeout - kill the container
+            except Exception as e:
+                logger.warning(f"Container wait error (timeout killing): {e}")
                 container.kill(signal.SIGKILL)
                 container.wait()
                 duration_ms = timeout * 1000
@@ -255,8 +255,8 @@ __builtins__.__import__ = _safe_import
             if container:
                 try:
                     container.remove(force=True)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Container remove failed for {sandbox_id}: {e}")
         except Exception as e:
             logger.warning(f"Cleanup failed for {sandbox_id}: {e}")
 
@@ -266,8 +266,8 @@ __builtins__.__import__ = _safe_import
         if container:
             try:
                 container.kill()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Container kill failed for {sandbox_id}: {e}")
             finally:
                 self._active_containers.pop(sandbox_id, None)
 

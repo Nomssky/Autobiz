@@ -3,7 +3,7 @@ from enum import Enum
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class BusinessBase(BaseModel):
@@ -118,7 +118,7 @@ class ApprovalRequestUpdate(BaseModel):
     impact_analysis: Optional[dict] = None
     urgency: Optional[str] = None
     status: Optional[str] = None
-    ceo_decision: Optional[str] = None
+    ceo_comments: Optional[str] = None
     decided_by_ceo_id: Optional[UUID] = None
     decided_at: Optional[datetime] = None
 
@@ -133,7 +133,7 @@ class ApprovalRequestResponse(BaseModel):
     impact_analysis: Optional[dict] = None
     urgency: str
     status: str
-    ceo_decision: Optional[str] = None
+    ceo_comments: Optional[str] = None
     decided_by_ceo_id: Optional[UUID] = None
     decided_at: Optional[datetime] = None
     expires_at: Optional[datetime] = None
@@ -152,7 +152,13 @@ class ApprovalDecision(str, Enum):
 class ApprovalDecisionRequest(BaseModel):
     decision: ApprovalDecision
     ceo_id: UUID
-    comments: Optional[str] = None
+    comments: str = ""
+
+    @model_validator(mode="after")
+    def _require_comments_for_reject(self):
+        if self.decision == ApprovalDecision.REJECT and not self.comments:
+            raise ValueError("Alasan wajib diisi saat menolak")
+        return self
 
 
 # ---- Deployment Schemas ----

@@ -3,12 +3,15 @@ Batch processing tasks for the AutoBiz Engine.
 Handles high-volume operations that benefit from batching.
 """
 
+import logging
 from datetime import datetime
 
-from celery import current_app
+from app.workers.celery_app import celery_app
+
+logger = logging.getLogger(__name__)
 
 
-@current_app.task(
+@celery_app.task(
     bind=True,
     max_retries=3,
     default_retry_delay=60,
@@ -57,7 +60,7 @@ def batched_create_business(self, business_items: list[dict]):
         raise self.retry(exc=exc)
 
 
-@current_app.task(
+@celery_app.task(
     bind=True,
     max_retries=2,
     name="app.tasks.batch_tasks.batched_metrics_aggregation",
@@ -126,8 +129,8 @@ def batched_metrics_aggregation(self):
                         300,  # 5 min TTL
                         __import__("json").dumps(result, default=str),
                     )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to cache metrics to Redis: {e}")
 
             return result
         finally:
@@ -137,7 +140,7 @@ def batched_metrics_aggregation(self):
         raise self.retry(exc=exc)
 
 
-@current_app.task(
+@celery_app.task(
     bind=True,
     name="app.tasks.batch_tasks.cache_cleanup",
 )
@@ -167,7 +170,7 @@ def cache_cleanup(self):
         raise self.retry(exc=exc, countdown=60)
 
 
-@current_app.task(
+@celery_app.task(
     bind=True,
     max_retries=3,
     name="app.tasks.batch_tasks.retry_failed_tasks",

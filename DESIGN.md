@@ -1,342 +1,153 @@
-# AutoBiz Engine — TUI Design Document
+Siap! Ini dia versi penuh (full version) dari file `DESIGN.md`-nya. Formatnya sudah disesuaikan persis seperti standar *System Prompt* agar AI *coding assistant* kamu (seperti Cursor, GitHub Copilot, atau ChatGPT) bisa langsung memahaminya dan membuat kode yang sesuai dengan visi "ramah untuk orang awam" di semua sistem operasi.
 
-## Apa Itu AutoBiz Engine?
+Tinggal klik tombol **Copy** di sudut blok kode di bawah ini, lalu *paste* ke file `DESIGN.md` kamu:
 
-AutoBiz Engine adalah AI-powered platform untuk membangun dan mengoperasikan bisnis digital secara otonom. User (CEO) cukup memberikan ide bisnis, lalu sistem akan mengorkestrasi tim AI agent (Researcher, Developer, Designer, Marketer, Finance, Support) untuk meneliti, membangun, mendesain, memasarkan, dan mengelola keuangan bisnis tersebut.
+```markdown
+# 🤖 SYSTEM BLUEPRINT & AI PROMPT: AutoBiz Engine TUI
+> **Target Audience:** Non-Technical Users (Laypeople / Aspiring CEOs).
+> **Platform Requirement:** Cross-Platform (Windows, macOS, Linux).
+> **Tech Stack:** Go (Bubbletea) for TUI Front-End, Python (FastAPI) for Backend.
 
-## Arsitektur
+## 🎯 1. DIRECTIVE FOR AI DEVELOPER
+Anda adalah *Expert Go Developer & UI/UX Designer*. Tugas Anda adalah membangun Terminal User Interface (TUI) untuk **AutoBiz Engine**, sebuah platform orkestrasi AI otonom untuk bisnis.
 
-```
-┌─────────────────────────────────────────────────┐
-│                   TUI (Go/Bubbletea)             │
-│  ┌───────────┬──────────┬──────────┬──────────┐ │
-│  │ Dashboard │Businesses│Approvals │ Metrics  │ │
-│  └───────────┴──────────┴──────────┴──────────┘ │
-│                    │ HTTP REST                    │
-└────────────────────┼────────────────────────────┘
-                     ▼
-┌──────────────────────────────────────────────────┐
-│           Backend (Python/FastAPI)                │
-│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐  │
-│  │ Auth │ │ Biz  │ │Approval│ │Metrics│ │Agent │  │
-│  └──────┘ └──────┘ └──────┘ └──────┘ └──────┘  │
-│                    │ SQLAlchemy                   │
-│              ┌─────┴─────┐                       │
-│              │  SQLite/  │                       │
-│              │PostgreSQL │                       │
-│              └───────────┘                       │
-└──────────────────────────────────────────────────┘
-```
-
-## User Flow
-
-```
-Start → Login/Register → Dashboard
-                            │
-              ┌─────────────┼─────────────┐
-              ▼             ▼             ▼
-         Businesses    Approvals      Metrics
-              │             │             │
-    ┌─────────┼──┐    ┌─────┴─────┐       │
-    ▼         ▼  ▼    ▼           ▼       ▼
-  List    Create Detail Approve  Reject  View Stats
-```
-
-## Backend API Endpoints
-
-Base URL: `http://localhost:8000/api/v1`
-
-### Auth
-
-| Method | Path | Body | Response | Notes |
-|--------|------|------|----------|-------|
-| POST | `/auth/register` | `{email, password, name}` | `{access_token, token_type, user_id, email, name, role}` | Buat akun baru |
-| POST | `/auth/login` | `{email, password}` | `{access_token, token_type, user_id, email, name, role}` | Login |
-
-### Businesses
-
-| Method | Path | Body/Params | Response | Notes |
-|--------|------|-------------|----------|-------|
-| GET | `/businesses/` | `?status=&skip=&limit=` | `[{id, name, description, status, current_phase, created_at, updated_at}]` | List semua bisnis |
-| POST | `/businesses/create` | `{idea}` | `{id, name, status, ...}` | Buat bisnis baru dari ide |
-| GET | `/businesses/{id}` | — | `{id, name, status, current_phase, ceo_id, ...}` | Detail bisnis |
-| PATCH | `/businesses/{id}` | `{name?, status?, ...}` | `{id, name, ...}` | Update bisnis |
-| DELETE | `/businesses/{id}` | — | 204 | Arsipkan bisnis |
-| POST | `/businesses/{id}/launch` | — | `{id, status: "operating", ...}` | Launch bisnis |
-| GET | `/businesses/{id}/timeline` | — | `{phases: [{role_name, task_type, status, ...}]}` | Timeline agent tasks |
-
-### Approvals
-
-| Method | Path | Body | Response | Notes |
-|--------|------|------|----------|-------|
-| GET | `/approvals/` | `?status=&business_id=` | `[{id, title, status, urgency, ...}]` | List approvals |
-| GET | `/approvals/pending` | — | `[{id, title, urgency, created_at, ...}]` | Pending approvals saja |
-| POST | `/approvals/` | `{business_id, title, description, proposed_changes, urgency}` | `{id, status: "pending", ...}` | Buat approval request |
-| POST | `/approvals/{id}/decide` | `{decision: "approve"|"reject", ceo_id, comments?}` | `{approved: bool, message}` | CEO decide |
-| PATCH | `/approvals/{id}` | `{title?, description?, ...}` | `{id, ...}` | Update approval |
-| DELETE | `/approvals/{id}` | — | 204 | Cancel approval |
-
-### Metrics
-
-| Method | Path | Body/Params | Response | Notes |
-|--------|------|-------------|----------|-------|
-| GET | `/metrics/` | `?business_id=&skip=&limit=` | `[{id, business_id, recorded_by_role, daily_revenue, users_count, churn_rate, created_at}]` | List metrics |
-| POST | `/metrics/` | `{business_id, recorded_by_role, daily_revenue?, users_count?, churn_rate?, ...}` | `{id, ...}` | Record metric |
-| GET | `/metrics/{id}` | — | `{id, ...}` | Detail metric |
-| GET | `/metrics/{id}/realtime` | — | `{current: {...}, trends: {...}, alerts: [...]}` | Realtime metrics |
-| GET | `/metrics/{id}/summary` | `?days=` | `{snapshot_count, avg_daily_revenue, avg_users, ...}` | Summary |
-
-### Vectors (Knowledge)
-
-| Method | Path | Body | Response | Notes |
-|--------|------|------|----------|-------|
-| POST | `/vectors/search` | `{business_id, query, top_k?}` | `{query, results: [{id, score, payload}]}` | Semantic search |
-| POST | `/vectors/upsert` | `{vectors: [{id, vector, payload}]}` | `{upserted_count}` | Insert vectors |
-| GET | `/vectors/{business_id}/knowledge` | — | `[{source, content, role}]` | Knowledge entries |
-| GET | `/vectors/stats` | — | `{total_vectors, backend, collection}` | Vector store stats |
-
-### Learning
-
-| Method | Path | Body | Response | Notes |
-|--------|------|------|----------|-------|
-| POST | `/learning/feedback` | `{business_id, content, feedback_type?, sentiment_score?}` | `{feedback_id, status, learning_actions}` | Submit feedback |
-| GET | `/learning/evaluation/{business_id}` | `?role=&days=` | `{overall_score, evaluations: [...]}` | Agent evaluation |
-| GET | `/learning/suggestions/{business_id}` | `?role=&days=` | `{suggestions: [...]}` | Improvement suggestions |
-| POST | `/learning/optimize-prompt` | `{business_id, role_name, original_prompt}` | `{original, optimized, ...}` | Optimize prompt |
-
-### Billing
-
-| Method | Path | Body | Response | Notes |
-|--------|------|------|----------|-------|
-| GET | `/billing/usage` | — | `{tier, subscription_status, usage: {...}, limits: {...}}` | Current usage |
-| POST | `/billing/upgrade` | `?tier=` | `{url?, type?}` | Upgrade subscription |
-| POST | `/billing/create-portal-session` | `{business_id}` | `{url}` | Stripe customer portal |
+**KRITERIA WAJIB (STRICT RULES):**
+1. **Zero-Friction UX:** Pengguna aplikasi ini adalah orang awam (bukan programmer). TUI tidak boleh terlihat seperti *hacker tool*. Jangan pernah tampilkan *raw JSON* atau *stack trace error* ke layar pengguna. Terjemahkan semua *response* sistem ke bahasa manusia yang ramah dan mudah dimengerti.
+2. **Cross-Platform Compatibility:** Gunakan library (`charmbracelet/bubbletea`) yang menjamin TUI berjalan mulus di Windows (CMD/PowerShell), macOS (Terminal/iTerm), dan Linux tanpa *dependency* atau pengaturan tambahan bagi *user*.
+3. **Responsive Design:** Gunakan *flexbox/grid layout* (dengan `charmbracelet/lipgloss`) agar UI menyesuaikan ukuran jendela terminal secara otomatis tanpa merusak tata letak teks.
+4. **Visual Feedback:** Selalu gunakan *loading spinner* (`charmbracelet/bubbles/spinner`), *progress bar*, atau notifikasi warna saat menunggu *response* dari Backend API agar pengguna tahu sistem sedang bekerja.
 
 ---
 
-## TUI Screens
+## 🏗️ 2. SYSTEM ARCHITECTURE
 
-### 1. Auth Screen (Login/Register)
-
-**State:** Sebelum user login
-
-```
-┌─────────────────────────────────────┐
-│         AutoBiz Engine              │
-│                                     │
-│  Email:                             │
-│  █                                  │
-│                                     │
-│  Enter: next • Backspace: delete    │
-│  Ctrl+C: quit                       │
-└─────────────────────────────────────┘
-```
-
-Flow: Email → Password → Name (kosongkan untuk login) → Submit
-
-### 2. Dashboard (Tab 1)
-
-**State:** Sesudah login, tab default
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  🖥️ TUI FRONTEND (Go / Bubbletea) - Cross-Platform Exec     │
+│  [Tab 1: ⌘ Dashboard] [Tab 2: 🏢 Biz] [Tab 3: ⚖️ Approvals] │
+│  UX: Layar harus terasa seperti dasbor game yang simpel.    │
+└────────────────────────────┬────────────────────────────────┘
+                             │ ⚡ Asynchronous HTTP REST
+┌────────────────────────────▼────────────────────────────────┐
+│  ⚙️ BACKEND ENGINE (Python / FastAPI)                       │
+│  [🔑 Auth] [🚀 Biz Logic] [🤖 Agent Orchestrator]           │
+└─────────────────────────────────────────────────────────────┘
 
 ```
-┌─────────────────────────────────────┐
-│  AutoBiz Engine | user@email.com    │
-│ ┌──────────┬──────────┬──────────┐  │
-│ │1:Dashboard│2:Business │3:Approval│ │
-│ └──────────┴──────────┴──────────┘  │
-│ ┌─────────────────────────────┐     │
-│ │ Welcome to AutoBiz Engine   │     │
-│ │                             │     │
-│ │ ┌──────┐ ┌──────┐ ┌──────┐ │     │
-│ │ │ Biz  │ │Approval│ │Metrics││     │
-│ │ │  3   │ │   2   │ │   5  │ │     │
-│ │ └──────┘ └──────┘ └──────┘ │     │
-│ │                             │     │
-│ │ ⚠ 2 pending approval(s)    │     │
-│ │                             │     │
-│ │ Press 1-4 to switch tabs    │     │
-│ └─────────────────────────────┘     │
-└─────────────────────────────────────┘
-```
-
-**Tombol:** `1-4` ganti tab, `n` create business, `q` quit
-
-### 3. Businesses List (Tab 2 — List Mode)
-
-```
-┌─────────────────────────────────────┐
-│  AutoBiz Engine | user@email.com    │
-│ ┌──────────┬──────────┬──────────┐  │
-│ │1:Dashboard│2:Business│3:Approval│ │
-│ └──────────┴──────────┴──────────┘  │
-│ ┌─────────────────────────────┐     │
-│ │ Businesses                  │     │
-│ │                             │     │
-│ │ ▸ AI SaaS Platform building │     │
-│ │   E-commerce Store  design  │     │
-│ │   Chatbot Service  research │     │
-│ │                             │     │
-│ │ ↑↓: navigate • enter: detail│     │
-│ │ n: new • r: refresh • q:quit│     │
-│ └─────────────────────────────┘     │
-└─────────────────────────────────────┘
-```
-
-**Tombol:** `↑↓`/`jk` navigasi, `enter` detail, `n` create, `r` refresh, `q` quit
-
-### 4. Create Business (Tab 2 — Create Mode)
-
-```
-┌─────────────────────────────────────┐
-│  AutoBiz Engine | user@email.com    │
-│ ┌──────────┬──────────┬──────────┐  │
-│ │1:Dashboard│2:Business│3:Approval│ │
-│ └──────────┴──────────┴──────────┘  │
-│ ┌─────────────────────────────┐     │
-│ │ New Business                │     │
-│ │                             │     │
-│ │ Describe your business idea:│     │
-│ │ AI-powered SaaS for █       │     │
-│ │                             │     │
-│ │ Enter: create • Esc: back   │     │
-│ └─────────────────────────────┘     │
-└─────────────────────────────────────┘
-```
-
-**Tombol:** `enter` create, `Esc` back
-
-### 5. Business Detail (Tab 2 — Detail Mode)
-
-```
-┌─────────────────────────────────────┐
-│  AutoBiz Engine | user@email.com    │
-│ ┌──────────┬──────────┬──────────┐  │
-│ │1:Dashboard│2:Business│3:Approval│ │
-│ └──────────┴──────────┴──────────┘  │
-│ ┌─────────────────────────────┐     │
-│ │ AI SaaS Platform            │     │
-│ │                             │     │
-│ │ ID:     abc123-...          │     │
-│ │ Status: building            │     │
-│ │ Phase:  design              │     │
-│ │ Created: 2026-05-14         │     │
-│ │                             │     │
-│ │ Esc: back                   │     │
-│ └─────────────────────────────┘     │
-└─────────────────────────────────────┘
-```
-
-**Tombol:** `Esc`/`q` back
-
-### 6. Approvals (Tab 3)
-
-```
-┌─────────────────────────────────────┐
-│  AutoBiz Engine | user@email.com    │
-│ ┌──────────┬──────────┬──────────┐  │
-│ │1:Dashboard│2:Business│3:Approval│ │
-│ └──────────┴──────────┴──────────┘  │
-│ ┌─────────────────────────────┐     │
-│ │ Approvals                   │     │
-│ │                             │     │
-│ │ ▸ Marketing Budget  HIGH    │     │
-│ │   Design Approval  normal   │     │
-│ │                             │     │
-│ │ ← → navigate               │     │
-│ │ a: approve • r: reject     │     │
-│ │ enter: toggle detail       │     │
-│ └─────────────────────────────┘     │
-└─────────────────────────────────────┘
-```
-
-**Tombol:** `↑↓`/`jk` navigasi, `a` approve, `r` reject, `enter` toggle detail
-
-### 7. Metrics (Tab 4)
-
-```
-┌─────────────────────────────────────┐
-│  AutoBiz Engine | user@email.com    │
-│ ┌──────────┬──────────┬──────────┐  │
-│ │1:Dashboard│2:Business│3:Approval│ │
-│ └──────────┴──────────┴──────────┘  │
-│ ┌─────────────────────────────┐     │
-│ │ Metrics                     │     │
-│ │                             │     │
-│ │ finance                     │     │
-│ │   Revenue:    $1,450.75     │     │
-│ │   Users:      342           │     │
-│ │   Churn Rate: 2.8%          │     │
-│ │   2026-05-14                │     │
-│ │                             │     │
-│ │ r: refresh • q: quit        │     │
-│ └─────────────────────────────┘     │
-└─────────────────────────────────────┘
-```
-
-**Tombol:** `r` refresh
 
 ---
 
-## TUI Component Tree
+## 🗺️ 3. NON-TECHNICAL USER FLOW
+
+Terapkan alur ini dengan navigasi keyboard yang sangat mudah ditebak. Jika pengguna menekan tombol yang salah, jangan *crash*, berikan petunjuk *hint* di layar bawah.
+
+```text
+[Buka App] ──> [Layar Login Ramah] ──> [⌘ Dashboard: Ringkasan Bisnis]
+                                              │
+                      ┌───────────────────────┼───────────────────────┐
+                      ▼                       ▼                       ▼
+            [🏢 Ide Bisnis Baru]      [⚖️ Kotak Keputusan]      [📈 Laporan Uang]
+            (Input form sederhana)    (Pilih: Setuju/Tolak)     (Grafik & Angka Jelas)
 
 ```
-App
-├── AuthScreen (stateLogin / stateRegister)
-│   ├── EmailInput
-│   ├── PasswordInput
-│   └── NameInput (opsional, untuk register)
-│
-└── DashboardScreen (stateDashboard)
-    ├── Header
-    │   └── Title + UserEmail
-    ├── TabBar
-    │   ├── TabDashboard
-    │   ├── TabBusinesses
-    │   ├── TabApprovals
-    │   └── TabMetrics
-    └── ContentPanel
-        ├── DashboardHome
-        │   ├── StatCard (Businesses count)
-        │   ├── StatCard (Pending Approvals)
-        │   └── StatCard (Metrics count)
-        ├── BusinessesView
-        │   ├── BusinessList (pageList)
-        │   │   ├── BusinessItem (selected dengan ▸)
-        │   │   └── EmptyState
-        │   ├── CreateBusiness (pageCreate)
-        │   │   └── IdeaInput
-        │   └── BusinessDetail (pageDetail)
-        ├── ApprovalsView
-        │   ├── ApprovalList
-        │   │   └── ApprovalItem (selected dengan ▸)
-        │   └── EmptyState
-        └── MetricsView
-            └── MetricList
+
+---
+
+## 🔌 4. BACKEND API INTEGRATION MAP
+
+*AI Instruction: Petakan endpoint ini ke state management di Bubbletea. Gunakan `tea.Cmd` untuk fetching data secara asynchronous agar UI tidak freeze.*
+
+**Base URL:** `http://localhost:8000/api/v1`
+
+### A. Auth (Onboarding)
+
+* `POST /auth/login` | Body: `{email, password}`
+* *UI Rule:* Saat mengetik password, sembunyikan karakter dengan `***`.
+
+### B. Businesses (Core Engine)
+
+* `GET /businesses/`
+* *UI Rule:* Tampilkan sebagai *list* atau *card* dengan status yang jelas menggunakan ikon (Misal: 🟡 Merancang, 🟢 Aktif).
+
+
+* `POST /businesses/create` | Body: `{idea}`
+* *UI Rule:* Berikan *text box* (textarea) yang luas agar user bebas menulis ide layaknya sedang *chatting* dengan asisten.
+
+
+* `POST /businesses/{id}/launch`
+* *UI Rule:* Buat animasi sukses yang memuaskan (misal: perubahan warna seketika atau teks "LILIS SUKSES!") saat tombol ini ditekan.
+
+
+
+### C. Approvals (CEO Control)
+
+* `GET /approvals/pending`
+* `POST /approvals/{id}/decide` | Body: `{decision: "approve"|"reject"}`
+* *UI Rule:* Ini adalah fitur utama interaksi. Buat layar ini terasa seperti kotak masuk (inbox) surel yang penting. Beri instruksi sangat jelas di layar: `[A] Setuju` atau `[R] Tolak`.
+
+### D. Metrics (Performance)
+
+* `GET /metrics/{id}/realtime`
+* *UI Rule:* Ubah data mentah (angka) menjadi indikator visual yang mudah dimengerti (Contoh: "⬆️ Naik 20%", "🚨 Sedang sepi pengunjung").
+
+---
+
+## 🖥️ 5. COMPONENT TREE & STATE MANAGEMENT
+
+Bangun struktur komponen Go (Model) seperti berikut untuk memastikan skalabilitas dan kerapian kode:
+
+```go
+AppModel (Memegang Global State & Auth Token)
+├── ScreenAuth
+│   └── InputForm (Email, Password via bubbles/textinput)
+└── ScreenMain (Tampil setelah login berhasil)
+    ├── HeaderComponent (Tampilkan Nama User & Status Koneksi Backend)
+    ├── TabNavigator (Fokus kontrol navigasi horizontal: tombol 1, 2, 3, 4)
+    ├── ContentRouter (Switch case berdasarkan tab aktif)
+    │   ├── ViewDashboard (Statistik Global / Summary)
+    │   ├── ViewBusinesses (List model & Form Create)
+    │   ├── ViewApprovals (Inbox Keputusan model)
+    │   └── ViewMetrics (Tabel & Mini-Charts model)
+    └── FooterHelp (Selalu tampil di bawah: "Tekan 'q' untuk keluar, 'esc' kembali")
+
 ```
 
-## Color Palette
+---
 
-| Token | Dark Color | Penggunaan |
-|-------|-----------|------------|
-| `subtle` | `#383838` | Border, separator |
-| `highlight` | `#7B59E0` | Active tab border, selected item |
-| `special` | `#73F59F` | Success, stat card accent |
-| `warn` | `#E06C75` | Error, high urgency, reject |
-| `info` | `#61AFEF` | Info text, metric labels |
+## 🎨 6. UI/UX DESIGN TOKENS (Bubbletea Lipgloss)
 
-## Key Bindings
+Gunakan palet warna ini menggunakan library `lipgloss`. Warna dipilih berdasarkan psikologi desain agar orang awam langsung paham konteksnya.
 
-| Key | Screen | Action |
-|-----|--------|--------|
-| `1-4` | Dashboard | Switch tabs |
-| `↑` / `k` | Lists | Navigate up |
-| `↓` / `j` | Lists | Navigate down |
-| `enter` | Lists | Select/detail |
-| `enter` | Auth | Next field / submit |
-| `n` | Dashboard/Biz | Create new business |
-| `a` | Approvals | Approve selected |
-| `r` | Approvals | Reject selected |
-| `r` | Metrics | Refresh |
-| `Esc` | Any | Back to previous screen |
-| `q` / `Ctrl+C` | Any | Quit |
-| `backspace` | Input | Delete character |
+| State/Fungsi | Warna Hex | Penerapan TUI |
+| --- | --- | --- |
+| **Border / Pasif** | `#5C6370` | Garis kotak yang tidak aktif, teks petunjuk bantuan di footer. |
+| **Active / Focus** | `#C678DD` | (Ungu Terang) Tab yang sedang dibuka, input text yang sedang aktif, baris list yang disorot. |
+| **Success / Action** | `#98C379` | (Hijau) Tanda uang/profit masuk, tombol "Approve", status bisnis "Aktif". |
+| **Warning / Danger** | `#E06C75` | (Merah) Error koneksi, penolakan (tombol "Reject"), notifikasi krisis atau *churn rate* tinggi. |
+| **Info / Reading** | `#61AFEF` | (Biru) Teks isi penjelasan dari AI, indikator angka metrik netral. |
+
+---
+
+## ⌨️ 7. UNIVERSAL KEY BINDINGS
+
+*AI Instruction: Daftarkan key bindings ini secara konsisten di seluruh layar menggunakan `bubbles/key`. Tampilkan panduan tombol ini di bagian bawah layar (Footer) secara dinamis sesuai menu yang sedang dibuka.*
+
+| Key | Action | UX Note untuk Laypeople |
+| --- | --- | --- |
+| `Tab` / `Shift+Tab` | Pindah kolom input | Standar universal form di komputer. |
+| `1`, `2`, `3`, `4` | Pindah Menu Utama | Sangat intuitif untuk navigasi cepat antar menu (Dashboard, Biz, Approvals, Metrics). |
+| `Panah Atas/Bawah` | Scroll / Pilih *list* | Menggantikan *mouse scroll*. |
+| `Enter` | Konfirmasi / Buka | Menggantikan *klik kiri mouse* untuk memilih item atau submit form. |
+| `Esc` | Kembali / Batal | *Safety button* jika user salah masuk menu atau ingin batal mengisi form. |
+| `a` | Approve (Setuju) | *Shortcut* khusus saat berada di dalam menu *Approvals*. |
+| `r` | Reject (Tolak) | *Shortcut* khusus saat berada di dalam menu *Approvals*. |
+| `q` | Keluar Aplikasi | Tombol aman untuk keluar (mencegah user panik menekan `Ctrl+C`). |
+
+---
+
+**END OF SYSTEM INSTRUCTION.**
+*Execute the Go/Bubbletea implementation based strictly on the user-centric guidelines above. Prioritize clean, idiomatic Go code.*
+
+```
+
+```

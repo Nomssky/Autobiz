@@ -502,9 +502,13 @@ View in Dashboard: https://autobiz.ai/businesses/{business_id}/approvals
 
         # Email notification
         subject, html, plain = self._build_approval_email(approval_data, decision)
-        agent_email = os.environ.get("AGENT_EMAIL", "agent@example.com")
-        email_result = await self.email.send(agent_email, subject, html, plain)
-        results.append(("email", email_result))
+        agent_email = os.environ.get("AGENT_EMAIL", "")
+        if not agent_email:
+            logger.warning("AGENT_EMAIL not set — agent notification skipped")
+            results.append(("email", False))
+        else:
+            email_result = await self.email.send(agent_email, subject, html, plain)
+            results.append(("email", email_result))
 
         for channel, ok in results:
             status = "SUCCESS" if ok else "FAILED"
@@ -557,8 +561,8 @@ View in Dashboard: https://autobiz.ai/businesses/{business_id}/approvals
                         ).scalar_one_or_none()
                         if user and user.email:
                             return user.email
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to resolve CEO email: {e}")
         return os.environ.get("CEO_EMAIL", "")
 
     def _resolve_ceo_phone(self, approval_data: Dict) -> str:
@@ -581,8 +585,8 @@ View in Dashboard: https://autobiz.ai/businesses/{business_id}/approvals
                         ).scalar_one_or_none()
                         if user and hasattr(user, "phone") and user.phone:
                             return user.phone
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning(f"Failed to resolve CEO phone: {e}")
         return os.environ.get("CEO_PHONE", "")
 
     async def send_system_alert(
@@ -602,12 +606,10 @@ View in Dashboard: https://autobiz.ai/businesses/{business_id}/approvals
         self, agent_role: str, approval_data: Dict, decision: str
     ) -> bool:
         """Notify an agent about an approval decision."""
-        logger.info(
-            f"Agent {agent_role} notified about decision: {decision} on {approval_data.get('title', '')}"
-        )
+        logger.info(f"Agent {agent_role} notified: {decision} — {approval_data.get('title', '')}")
         return True
 
     async def broadcast_to_all_ceos(self, message: str, data: Optional[Dict] = None) -> bool:
-        """Broadcast a message to all CEOs."""
+        """Broadcast a message to all CEOs (future: email, Discord, in-app)."""
         logger.info(f"Broadcast: {message}")
         return True

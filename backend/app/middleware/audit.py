@@ -31,27 +31,24 @@ class AuditMiddleware(BaseHTTPMiddleware):
         ):
             user_id = getattr(request.state, "user_id", None)
             if user_id and response.status_code < 400:
+                action = f"{request.method} {request.url.path}".split("?")[0]
+                db = SessionLocal()
                 try:
-                    action = f"{request.method} {request.url.path}".split("?")[0]
-                    db = SessionLocal()
-                    try:
-                        log = AuditLog(
-                            user_id=UUID(user_id) if user_id else None,
-                            action=action,
-                            resource_type=(
-                                request.url.path.split("/")[3]
-                                if len(request.url.path.split("/")) > 3
-                                else None
-                            ),
-                            ip_address=request.client.host if request.client else None,
-                        )
-                        db.add(log)
-                        db.commit()
-                    except Exception:
-                        pass
-                    finally:
-                        db.close()
-                except Exception:
-                    pass
+                    log = AuditLog(
+                        user_id=UUID(user_id) if user_id else None,
+                        action=action,
+                        resource_type=(
+                            request.url.path.split("/")[3]
+                            if len(request.url.path.split("/")) > 3
+                            else None
+                        ),
+                        ip_address=request.client.host if request.client else None,
+                    )
+                    db.add(log)
+                    db.commit()
+                except Exception as e:
+                    logger.warning(f"Audit log failed: {e}")
+                finally:
+                    db.close()
 
         return response

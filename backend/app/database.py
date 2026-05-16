@@ -26,13 +26,7 @@ def get_engine():
             logger.info("Database engine created successfully")
         except Exception as e:
             logger.error(f"Failed to create database engine: {e}")
-            # Fallback to SQLite for development/testing
-            if settings.DEBUG:
-                engine = create_engine(
-                    "sqlite:///./test.db", connect_args={"check_same_thread": False}, echo=False
-                )
-            else:
-                raise
+            raise
     return engine
 
 

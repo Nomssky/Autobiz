@@ -24,6 +24,7 @@ try:
                 settings.REDIS_URL, socket_timeout=2, decode_responses=True
             )
         except Exception:
+            logger.debug("Redis unavailable — falling back to in-memory rate limiter")
             return None
 
 except ImportError:
@@ -61,6 +62,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 r.expire(key, self.window_seconds)
                 return await call_next(request)
             except Exception:
+                logger.debug("Redis operation failed — falling back to in-memory rate limiter")
                 r = None
         if r is None:
             now = time.time()

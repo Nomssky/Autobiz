@@ -43,10 +43,17 @@ def get_current_user(request: Request) -> UUID:
 
 
 def require_ceo(
+    request: Request,
     ceo_id: UUID = Depends(get_current_user),
 ) -> UUID:
-    """Dependency that ensures the current user is a CEO."""
-    return ceo_id
+    """Dependency that ensures the current user has CEO role."""
+    user_roles = getattr(request.state, "roles", [])
+    if "ceo" in user_roles:
+        return ceo_id
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="CEO role required",
+    )
 
 
 def require_role(allowed_roles: List[str]):

@@ -1,7 +1,10 @@
 """Vector memory API endpoints — semantic search and knowledge management."""
 
+import logging
 from typing import List
 from uuid import UUID
+
+logger = logging.getLogger(__name__)
 
 from app.api.dependencies import get_db_session, require_ceo
 from app.infrastructure.vector_store import VectorStore
@@ -188,8 +191,8 @@ def get_vector_stats(
             "collection": vs._collection,
         }
     except Exception as e:
-        return {
-            "total_vectors": 0,
-            "backend": "unavailable",
-            "error": str(e),
-        }
+        logger.error(f"Vector stats failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Vector store unavailable: {str(e)}",
+        )

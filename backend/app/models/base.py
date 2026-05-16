@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import JSON, Column, DateTime, String, TypeDecorator
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
+from typing import Any
 
 Base = declarative_base()
 
@@ -39,13 +40,21 @@ class GUID(TypeDecorator):
 
         return dialect.type_descriptor(PG_UUID(as_uuid=True))
 
-    def process_bind_param(self, value, dialect):
-        if value is not None and dialect.name == "sqlite":
+    def process_bind_param(self, value: Any, dialect: Any) -> Any:
+        if value is None:
+            return None
+        if dialect.name == "sqlite":
             return str(value)
+        if isinstance(value, str):
+            return uuid.UUID(value)
         return value
 
-    def process_result_value(self, value, dialect):
-        if value is not None and dialect.name == "sqlite":
+    def process_result_value(self, value: Any, dialect: Any) -> Any:
+        if value is None:
+            return None
+        if dialect.name == "sqlite":
+            return str(value)
+        if isinstance(value, uuid.UUID):
             return str(value)
         return value
 

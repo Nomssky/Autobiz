@@ -10,18 +10,7 @@ from pydantic import BaseModel, ValidationError
 
 logger = logging.getLogger(__name__)
 
-# ---- Tool import with graceful fallback ----
-
-try:
-    from langchain_core.tools import Tool
-except ImportError:
-    logger.warning("langchain-core not installed — using mock Tool class")
-
-    class Tool:
-        def __init__(self, name: str, func, description: str):
-            self.name = name
-            self.func = func
-            self.description = description
+from langchain_core.tools import Tool
 
 
 class AgentResult(BaseModel):
@@ -52,10 +41,17 @@ class BaseAgent(ABC):
         self.business_id = business_id
         self.role_name = role_name
         self.config = config
+
+        # Apply user override if provided (from agent config system)
+        override = config.get("user_override", {})
+        model = override.get("model_override") or config.get("model")
+        temperature = override.get("temperature") or config.get("temperature")
+        api_key = override.get("api_key") or config.get("api_key")
+
         self.llm = create_llm(
-            model=config.get("model"),
-            temperature=config.get("temperature"),
-            api_key=config.get("api_key"),
+            model=model,
+            temperature=temperature,
+            api_key=api_key,
         )
         self.vector_store = None
         self.memory = {}
@@ -104,9 +100,9 @@ class BaseAgent(ABC):
 
     async def retrieve_from_memory(self, query: str, limit: int = 5) -> List[Dict]:
         """Retrieve relevant context from memory"""
-        # Simple mock: return memories that have the query in the key
         results = []
+        q = query.lower()
         for key, value in self.memory.items():
-            if query.lower() in key.lower():
+            if q in key.lower() or q in str(value.get("value", "")).lower():
                 results.append(value)
         return results[:limit]

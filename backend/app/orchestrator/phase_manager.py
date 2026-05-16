@@ -11,6 +11,7 @@ from app.agents.finance import FinanceAgent
 from app.agents.marketer import MarketerAgent
 from app.agents.researcher import ResearcherAgent
 from app.agents.support import SupportAgent
+from app.agents.base_agent import AgentResult
 from app.approval.gateway import approval_gateway
 from app.approval.notifier import ApprovalNotifier
 from app.database import get_db_session
@@ -126,17 +127,7 @@ class PhaseManager:
             )
         except Exception as e:
             logger.error(f"Design phase failed: {e}")
-            design_result = type(
-                "obj",
-                (),
-                {
-                    "success": False,
-                    "output": {},
-                    "error": str(e),
-                    "requires_approval": False,
-                    "approval_proposal": None,
-                },
-            )()
+            design_result = AgentResult(success=False, output={}, error=str(e))
 
         if design_result.success:
             phase_results["design"] = design_result.output
@@ -156,17 +147,7 @@ class PhaseManager:
             )
         except Exception as e:
             logger.error(f"Marketing phase failed: {e}")
-            marketing_result = type(
-                "obj",
-                (),
-                {
-                    "success": False,
-                    "output": {},
-                    "error": str(e),
-                    "requires_approval": False,
-                    "approval_proposal": None,
-                },
-            )()
+            marketing_result = AgentResult(success=False, output={}, error=str(e))
 
         if marketing_result.success:
             phase_results["marketing"] = marketing_result.output
@@ -186,17 +167,7 @@ class PhaseManager:
             )
         except Exception as e:
             logger.error(f"Finance phase failed: {e}")
-            finance_result = type(
-                "obj",
-                (),
-                {
-                    "success": False,
-                    "output": {},
-                    "error": str(e),
-                    "requires_approval": False,
-                    "approval_proposal": None,
-                },
-            )()
+            finance_result = AgentResult(success=False, output={}, error=str(e))
 
         if finance_result.requires_approval and finance_result.approval_proposal:
             approved = await self._wait_for_approval(
@@ -526,12 +497,5 @@ class PhaseManager:
                 business = result.scalar_one_or_none()
                 return business.config if business else {}
         except Exception as e:
-            logger.error(f"Config load failed: {e}")
-            return {
-                "researcher": {},
-                "developer": {},
-                "designer": {},
-                "marketer": {},
-                "finance": {},
-                "support": {},
-            }
+            logger.error(f"Config load failed for business {self.business_id}: {e}")
+            raise

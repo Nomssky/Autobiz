@@ -2,6 +2,7 @@
 
 import os
 
+from app.agents.registry import AGENTS, classify_model, check_warnings
 from app.api.dependencies import get_db_session, require_ceo
 from app.config import settings as app_settings
 from fastapi import APIRouter, Depends, HTTPException
@@ -22,7 +23,7 @@ class TestLLMRequest(BaseModel):
 
 @router.get("/status", summary="Get integration status for all services")
 def get_status(_: UUID = Depends(require_ceo)):
-    """Check connectivity for backend, database, LLM, Redis, etc."""
+    """Check connectivity for backend, database, LLM, Ollama, Redis, etc."""
     status = {
         "backend": {"status": "ok", "version": "1.0.0"},
         "database": {"status": "unknown"},
@@ -31,7 +32,7 @@ def get_status(_: UUID = Depends(require_ceo)):
             "provider": app_settings.LLM_PROVIDER or "not configured",
             "model": app_settings.LLM_MODEL or app_settings.OPENAI_MODEL or "",
         },
-        "stripe": {"status": "unknown"},
+        "ollama": {"status": "unknown"},
         "notifications": {"status": "unknown"},
         "redis": {"status": "unknown"},
     }
@@ -60,12 +61,19 @@ def get_status(_: UUID = Depends(require_ceo)):
     else:
         status["llm"]["status"] = "not_configured"
 
-    # Check Stripe
-    stripe_key = app_settings.STRIPE_API_KEY or ""
-    if stripe_key and stripe_key != "your-stripe-api-key":
-        status["stripe"] = {"status": "configured", "key_prefix": stripe_key[:8] + "..."}
-    else:
-        status["stripe"] = {"status": "not_configured"}
+    # Check Ollama
+    try:
+        import httpx
+        base_url = (app_settings.OLLAMA_BASE_URL or "http://localhost:11434").rstrip("/")
+        resp = httpx.get(f"{base_url}/api/tags", timeout=3.0)
+        if resp.status_code == 200:
+            models = [m["name"] for m in resp.json().get("models", [])]
+            status["ollama"] = {"status": "running", "models": models}
+        else:
+            status["ollama"] = {"status": "error"}
+    except Exception as e:
+        logger.warning(f"Ollama check failed: {e}")
+        status["ollama"] = {"status": "not_running"}
 
     # Check Notifications (Discord + Email)
     discord = bool(app_settings.DISCORD_WEBHOOK_URL)
@@ -88,10 +96,25 @@ def get_status(_: UUID = Depends(require_ceo)):
             r = _redis.from_url(app_settings.REDIS_URL)
             r.ping()
             status["redis"] = {"status": "connected"}
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Redis check failed: {e}")
             status["redis"] = {"status": "error", "error": "cannot connect"}
     else:
         status["redis"] = {"status": "not_configured"}
+
+    # Agent recommendations
+    model_name = app_settings.LLM_MODEL or app_settings.OPENAI_MODEL or ""
+    model_info = classify_model(model_name) if model_name else {"tier": "unknown", "name": "", "params": ""}
+    warnings = check_warnings({}, model_info.get("tier", "unknown"))
+    status["agent_recommendations"] = {
+        "detected_model": model_info["name"] if model_info.get("name") else "not configured",
+        "detected_tier": model_info.get("tier", "unknown"),
+        "warning_count": len(warnings),
+        "agents_suboptimal": [
+            {"agent": w["agent"], "label": w["label"], "min_tier": w["min_tier"], "warning": w["warning"]}
+            for w in warnings
+        ],
+    }
 
     return status
 
@@ -110,14 +133,11 @@ def test_llm(request: TestLLMRequest, _: UUID = Depends(require_ceo)):
         )
         import asyncio
 
-        loop = asyncio.new_event_loop()
-        try:
-            result = loop.run_until_complete(
-                llm.ainvoke("Say exactly: OK", system_prompt="Reply with only OK.")
-            )
-            return {"success": True, "response": result.strip(), "provider": request.provider or app_settings.LLM_PROVIDER}
-        finally:
-            loop.close()
+        async def _run():
+            return await llm.ainvoke("Say exactly: OK", system_prompt="Reply with only OK.")
+
+        result = asyncio.run(_run())
+        return {"success": True, "response": result.strip(), "provider": request.provider or app_settings.LLM_PROVIDER}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -128,7 +148,6 @@ def get_env(_: UUID = Depends(require_ceo)):
     env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "..", "..", ".env")
     alt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "..", "..", "..", ".env")
 
-    # Try multiple locations
     for p in [env_path, alt_path, os.path.abspath(".env")]:
         if os.path.exists(p):
             env_path = p
@@ -139,7 +158,6 @@ def get_env(_: UUID = Depends(require_ceo)):
     grouped_keys = {
         "LLM Provider": ["LLM_PROVIDER", "LLM_MODEL", "LLM_API_KEY", "LLM_BASE_URL", "LLM_TEMPERATURE", "OLLAMA_BASE_URL"],
         "Embedding": ["EMBEDDING_PROVIDER", "EMBEDDING_MODEL", "EMBEDDING_API_KEY", "EMBEDDING_BASE_URL"],
-        "Stripe": ["STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_STARTER_PRICE_ID", "STRIPE_GROWTH_PRICE_ID", "STRIPE_ENTERPRISE_PRICE_ID"],
         "Notifications": ["DISCORD_WEBHOOK_URL", "RESEND_API_KEY", "SENDGRID_API_KEY"],
         "Database": ["DATABASE_URL", "DATABASE_ECHO"],
         "Auth": ["SECRET_KEY", "ACCESS_TOKEN_EXPIRE_MINUTES"],
@@ -164,8 +182,8 @@ def get_env(_: UUID = Depends(require_ceo)):
                     key = key.strip()
                     val = val.strip().strip("\"'")
                     flat[key] = val
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to read .env file: {e}")
 
     for group, keys in grouped_keys.items():
         group_config = {}
@@ -208,8 +226,6 @@ def save_env(request: SaveEnvRequest, _: UUID = Depends(require_ceo)):
         "OLLAMA_BASE_URL",
         "OPENAI_API_KEY", "OPENAI_MODEL",
         "SECRET_KEY", "DATABASE_URL", "DEBUG", "REDIS_URL",
-        "STRIPE_API_KEY", "STRIPE_WEBHOOK_SECRET",
-        "STRIPE_STARTER_PRICE_ID", "STRIPE_GROWTH_PRICE_ID", "STRIPE_ENTERPRISE_PRICE_ID",
         "DISCORD_WEBHOOK_URL", "RESEND_API_KEY", "SENDGRID_API_KEY",
         "ACCESS_TOKEN_EXPIRE_MINUTES", "ENABLE_AUTO_APPROVE", "MAX_BUDGET_PER_BUSINESS",
     }
@@ -228,12 +244,10 @@ def save_env(request: SaveEnvRequest, _: UUID = Depends(require_ceo)):
                         updated.add(key)
                         continue
                 f.write(line)
-            # Append new keys that didn't exist
             for key, val in request.updates.items():
                 if key not in updated and key in allowed_keys:
                     f.write(f"{key}={val}\n")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save .env: {e}")
 
-    # Reload settings in memory (optional — next restart picks them up)
     return {"status": "saved", "updated": list(request.updates.keys())}

@@ -14,6 +14,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse
 from sqlalchemy import text
+from starlette.status import HTTP_503_SERVICE_UNAVAILABLE
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,8 +37,8 @@ def setup_sentry():
                     CeleryIntegration(),
                     SqlalchemyIntegration(),
                 ],
-                traces_sample_rate=getattr(settings, "SENTRY_TRACES_SAMPLE_RATE", 1.0),
-                environment=getattr(settings, "ENVIRONMENT", "production"),
+                traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE or 0.1,
+                environment=settings.ENVIRONMENT,
             )
             logger.info("Sentry initialized")
         except ImportError:
@@ -52,13 +53,11 @@ async def lifespan(app: FastAPI):
     """Startup/shutdown lifecycle hook."""
     logger.info("Starting up AutoBiz Engine API...")
     try:
+        from app.models.base import Base
 
         engine = get_engine()
-        if "sqlite" in str(engine.url):
-            from app.models.base import Base
-
-            Base.metadata.create_all(bind=engine)
-            logger.info("SQLite tables created automatically")
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created automatically")
     except Exception as e:
         logger.warning(f"Auto table creation skipped: {e}")
     yield
@@ -75,7 +74,7 @@ app = FastAPI(
 # ---- Middleware (order matters) ----
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -111,6 +110,10 @@ async def metrics_stats():
 # ---- Routers ----
 app.include_router(v1_router, prefix="/api/v1")
 
+# UI dashboard (not under /api/v1 — served directly for WebView)
+from app.api.v1.ui import router as ui_router
+app.include_router(ui_router, prefix="/ui")
+
 
 @app.get("/")
 async def root():
@@ -125,7 +128,10 @@ async def health_check():
             conn.execute(text("SELECT 1"))
         return {"status": "healthy", "database": "connected"}
     except Exception as e:
-        return {"status": "healthy", "database": "disconnected", "detail": str(e)}
+        return JSONResponse(
+            status_code=HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "unhealthy", "database": "disconnected", "detail": str(e)},
+        )
 
 
 @app.get("/health/ready")
